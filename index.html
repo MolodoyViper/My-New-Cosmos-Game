@@ -1,0 +1,3911 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#030712" />
+  <title>ICE NEBULA — 3D Cosmic Drift</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body, html {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%; height: 100dvh;
+      overflow: hidden; background-color: #030712;
+      font-family: 'Inter', sans-serif; color: #e2e8f0;
+      touch-action: none;
+      overscroll-behavior: none;
+      position: fixed;
+      inset: 0;
+    }
+    #menu-content {
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+    }
+    .safe-hud {
+      padding-top: max(0.75rem, env(safe-area-inset-top));
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+      padding-left: max(0.75rem, env(safe-area-inset-left));
+      padding-right: max(0.75rem, env(safe-area-inset-right));
+    }
+    .safe-menu {
+      padding-top: max(0.75rem, env(safe-area-inset-top));
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+      padding-left: max(0.75rem, env(safe-area-inset-left));
+      padding-right: max(0.75rem, env(safe-area-inset-right));
+    }
+    #game-canvas {
+      position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; display: block;
+      transform: translateZ(0);
+      will-change: transform;
+    }
+    /* Glassmorphism panels */
+    .ice-glass {
+      background: rgba(8, 15, 32, 0.82);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    }
+    /* Zero-cost crisp HUD cards during live 3D WebGL flight (avoids expensive real-time backdrop-filter readbacks on Mali/Adreno GPUs) */
+    #game-hud .ice-glass {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      background: rgba(8, 15, 32, 0.88);
+    }
+    .ice-card {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .ice-card:hover {
+      border-color: rgba(56, 189, 248, 0.55);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(14, 165, 233, 0.2);
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.4); border-radius: 999px; }
+    /* Companion 3D Floating Speech */
+    #companion-speech {
+      position: fixed;
+      z-index: 15;
+      pointer-events: none;
+      transform: translate(-50%, -100%);
+      text-align: center;
+      white-space: nowrap;
+      width: max-content;
+      max-width: none;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      color: #e0f2fe;
+      font-size: clamp(11px, 1.4vw, 14px);
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      line-height: 1.2;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.98), 0 0 14px rgba(103, 232, 249, 0.85);
+      transition: opacity 0.6s ease;
+    }
+
+    /* Avatar Frames */
+    .frame-none { border: 2px solid rgba(148,163,184,0.4); }
+    .frame-ice { border: 3px solid #38bdf8; box-shadow: 0 0 15px #38bdf8, inset 0 0 10px #7dd3fc; }
+    .frame-neon { border: 3px solid #e879f9; box-shadow: 0 0 16px #d946ef, 0 0 30px rgba(217,70,239,0.5); }
+    .frame-fire { border: 3px solid #f97316; box-shadow: 0 0 18px #ea580c, inset 0 0 8px #fde047; }
+    .frame-gold { border: 3px solid #facc15; box-shadow: 0 0 20px #eab308, inset 0 0 10px #fef08a; }
+    .frame-void { border: 3px solid #818cf8; box-shadow: 0 0 22px #4f46e5, 0 0 36px #312e81; }
+    .frame-emerald { border: 3px solid #34d399; box-shadow: 0 0 18px #10b981; }
+    .frame-crimson { border: 3px solid #f43f5e; box-shadow: 0 0 18px #e11d48, inset 0 0 10px #fda4af; }
+    .frame-amber { border: 3px solid #f59e0b; box-shadow: 0 0 16px #d97706, inset 0 0 8px #fcd34d; }
+    .frame-cyanpulse { border: 3px solid #22d3ee; box-shadow: 0 0 22px #06b6d4, 0 0 34px rgba(6,182,212,0.55); animation: pulseGlow 2.4s ease-in-out infinite; }
+    .frame-amethyst { border: 3px solid #a855f7; box-shadow: 0 0 20px #9333ea, inset 0 0 12px #e9d5ff; }
+    .frame-plasma { border: 3px double #38bdf8; outline: 2px solid rgba(192,132,252,0.7); outline-offset: 2px; box-shadow: 0 0 24px #c084fc; }
+    .frame-eclipse { border: 3px solid #fde047; box-shadow: 0 0 0 3px #090d16, 0 0 24px #f59e0b, inset 0 0 14px #000000; }
+    .frame-frostcrown { border: 3px solid #bae6fd; box-shadow: 0 0 18px #7dd3fc, 0 0 32px #38bdf8, inset 0 0 14px #e0f2fe; }
+    .frame-cybergrid { border: 3px dashed #2dd4bf; box-shadow: 0 0 18px #14b8a6, inset 0 0 10px rgba(45,212,191,0.5); }
+    .frame-bloodmoon { border: 3px solid #dc2626; box-shadow: 0 0 24px #991b1b, 0 0 40px rgba(220,38,38,0.6), inset 0 0 12px #fca5a5; }
+    .frame-stardust {
+      border: 3px solid transparent;
+      background-image: linear-gradient(#0f172a, #0f172a), linear-gradient(135deg, #fde047, #38bdf8, #f472b6, #fde047);
+      background-origin: border-box;
+      background-clip: content-box, border-box;
+      box-shadow: 0 0 22px rgba(253, 224, 71, 0.55);
+    }
+    .frame-quantum {
+      border: 3px solid transparent;
+      background-image: linear-gradient(#0f172a, #0f172a), linear-gradient(45deg, #22d3ee, #818cf8, #2dd4bf, #c084fc);
+      background-origin: border-box;
+      background-clip: content-box, border-box;
+      animation: spinHue 6s linear infinite;
+      box-shadow: 0 0 24px rgba(129, 140, 248, 0.65);
+    }
+    .frame-singularity {
+      border: 3px solid #f43f5e;
+      outline: 2px dashed #facc15;
+      outline-offset: 2px;
+      box-shadow: 0 0 28px #e11d48, 0 0 45px rgba(250,204,21,0.5);
+      animation: pulseGlow 1.8s ease-in-out infinite;
+    }
+    .frame-rainbow {
+      border: 3px solid transparent;
+      background-image: linear-gradient(#0f172a, #0f172a), linear-gradient(90deg, #38bdf8, #818cf8, #e879f9, #f43f5e, #facc15, #34d399, #38bdf8);
+      background-origin: border-box;
+      background-clip: content-box, border-box;
+      animation: spinHue 4s linear infinite;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+    }
+    .frame-prism-rainbow {
+      border: 4px solid transparent;
+      background-image: linear-gradient(#090d16, #090d16), conic-gradient(#ef4444, #f97316, #eab308, #22c55e, #06b6d4, #6366f1, #ec4899, #ef4444);
+      background-origin: border-box;
+      background-clip: content-box, border-box;
+      animation: spinHue 2.8s linear infinite;
+      box-shadow: 0 0 26px rgba(236, 72, 153, 0.7), 0 0 40px rgba(56, 189, 248, 0.5);
+    }
+    .effect-rainbow-prism {
+      background-size: 300% 300% !important;
+      animation: auroraShift 3s ease infinite, spinHue 5s linear infinite;
+      box-shadow: 0 0 32px rgba(236, 72, 153, 0.55), 0 0 48px rgba(56, 189, 248, 0.45);
+      border-color: rgba(250, 204, 21, 0.8) !important;
+    }
+    @keyframes spinHue { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+
+    /* Profile Effects */
+    .effect-pulse { animation: pulseGlow 2.8s ease-in-out infinite; }
+    @keyframes pulseGlow { 0%,100% { box-shadow: 0 0 15px rgba(56,189,248,0.2); } 50% { box-shadow: 0 0 32px rgba(56,189,248,0.55); } }
+    .effect-aurora {
+      background-size: 200% 200% !important;
+      animation: auroraShift 6s ease infinite;
+    }
+    .effect-hyperdrive {
+      background-size: 300% 300% !important;
+      animation: auroraShift 2.8s ease infinite;
+      box-shadow: 0 0 28px rgba(192, 132, 252, 0.45);
+    }
+    .effect-solarflare {
+      box-shadow: 0 0 26px rgba(251, 146, 60, 0.5), inset 0 0 22px rgba(250, 204, 21, 0.25);
+      animation: pulseGlow 2.2s ease-in-out infinite;
+    }
+    .effect-voidrift {
+      box-shadow: 0 0 30px rgba(99, 102, 241, 0.55), inset 0 0 28px rgba(15, 23, 42, 0.85);
+    }
+    .effect-supernova {
+      background-size: 250% 250% !important;
+      animation: auroraShift 3.5s ease infinite, pulseGlow 2s ease-in-out infinite;
+      border-color: rgba(251, 113, 133, 0.65) !important;
+    }
+    @keyframes auroraShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+    /* Rarity Badges */
+    .rar-common { color: #cbd5e1; border-color: rgba(148,163,184,0.35); }
+    .rar-rare { color: #38bdf8; border-color: rgba(56,189,248,0.5); }
+    .rar-epic { color: #c084fc; border-color: rgba(192,132,252,0.55); }
+    .rar-legendary { color: #facc15; border-color: rgba(250,204,21,0.65); }
+    .rar-mythic { color: #fb7185; border-color: rgba(251,113,133,0.75); text-shadow: 0 0 8px rgba(251,113,133,0.6); }
+
+    @keyframes floatSlow { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-6px); } }
+    .animate-float { animation: floatSlow 3.5s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+
+  <!-- 3D Viewport Canvas -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- 3D Projected Companion Speech Overlay -->
+  <div id="companion-speech" class="opacity-0"></div>
+
+  <!-- Toast Notification -->
+  <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none w-11/12 max-w-md"></div>
+
+  <!-- ========================================================= -->
+  <!-- IN-GAME MINIMALIST HUD                                    -->
+  <!-- ========================================================= -->
+  <div id="game-hud" class="hidden fixed inset-0 z-20 pointer-events-none flex flex-col justify-between safe-hud sm:p-5">
+    <div class="flex items-start justify-between gap-2">
+      <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div class="ice-glass px-3 py-1.5 rounded-xl flex items-center gap-2">
+          <span class="text-cyan-400 text-base">💎</span>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 leading-none">Кристаллы</div>
+            <div id="hud-crystals" class="text-sm sm:text-base font-bold text-cyan-200 leading-tight">0</div>
+          </div>
+        </div>
+        <div class="ice-glass px-3 py-1.5 rounded-xl flex items-center gap-2">
+          <span class="text-indigo-400 text-base">🚀</span>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 leading-none">Дистанция</div>
+            <div id="hud-distance" class="text-sm sm:text-base font-bold text-white leading-tight">0.00 км</div>
+          </div>
+        </div>
+        <div class="ice-glass px-3 py-1.5 rounded-xl hidden sm:flex items-center gap-2">
+          <span class="text-sky-300 text-sm">🌌</span>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 leading-none">Сектор</div>
+            <div id="hud-zone" class="text-xs font-semibold text-sky-200 leading-tight max-w-[140px] truncate">Ледяной Порог</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div class="ice-glass px-3 py-1.5 rounded-xl min-w-[110px] sm:min-w-[150px]">
+          <div class="flex justify-between items-center text-[11px] mb-1">
+            <span class="font-bold text-cyan-300">Ур. <span id="hud-level">1</span></span>
+            <span id="hud-xp-text" class="text-slate-400 text-[10px]">0 / 600</span>
+          </div>
+          <div class="w-full h-1.5 bg-slate-800/90 rounded-full overflow-hidden">
+            <div id="hud-xp-bar" class="h-full bg-gradient-to-r from-cyan-400 to-indigo-400 rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <button id="btn-pause" class="pointer-events-auto ice-glass hover:bg-sky-900/50 active:scale-95 text-cyan-200 p-2.5 rounded-xl transition cursor-pointer" title="Пауза">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="flex justify-between items-end">
+      <div id="hud-quest-box" class="ice-glass px-3 py-2 rounded-xl max-w-[260px] sm:max-w-xs opacity-90">
+        <div class="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">
+          <span>🎯</span> <span id="hud-quest-title">Активное задание</span>
+        </div>
+        <div id="hud-quest-desc" class="text-xs text-slate-200 mt-0.5 truncate">Соберите 25 кристаллов</div>
+        <div class="w-full h-1 bg-slate-800 rounded-full mt-1.5 overflow-hidden">
+          <div id="hud-quest-bar" class="h-full bg-cyan-400 transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="sm:hidden text-[10px] text-slate-400/70 bg-slate-950/40 px-2.5 py-1 rounded-lg">
+        Свайп / палец для полёта
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- PAUSE / GAME OVER MODAL OVERLAY                           -->
+  <!-- ========================================================= -->
+  <div id="overlay-modal" class="hidden fixed inset-0 z-30 bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="ice-glass rounded-2xl max-w-md w-full p-6 text-center border border-cyan-500/30 shadow-2xl">
+      <div id="modal-badge" class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 mb-2">ПАУЗА</div>
+      <h2 id="modal-title" class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Полёт приостановлен</h2>
+      <p id="modal-subtitle" class="text-sm text-slate-300 mt-1">Уровень и кристаллы надёжно сохранены</p>
+
+      <div id="modal-stats" class="grid grid-cols-3 gap-2 my-5">
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5">
+          <div class="text-[11px] text-slate-400">Дистанция</div>
+          <div id="stat-run-dist" class="text-base font-bold text-white mt-0.5">0.00 км</div>
+        </div>
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5">
+          <div class="text-[11px] text-slate-400">Собрано</div>
+          <div id="stat-run-crystals" class="text-base font-bold text-cyan-300 mt-0.5">+0 💎</div>
+        </div>
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5">
+          <div class="text-[11px] text-slate-400">Опыт (XP)</div>
+          <div id="stat-run-xp" class="text-base font-bold text-indigo-300 mt-0.5">+0 XP</div>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-2.5 mt-4">
+        <button id="btn-modal-primary" class="flex-1 py-3 px-4 rounded-xl font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-sky-300 hover:from-cyan-300 hover:to-white transition shadow-lg shadow-cyan-500/25 cursor-pointer">
+          Продолжить
+        </button>
+        <button id="btn-modal-menu" class="flex-1 py-3 px-4 rounded-xl font-semibold text-slate-200 bg-slate-800/90 hover:bg-slate-700 border border-slate-700 transition cursor-pointer">
+          В главное меню
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- CHEST OPENING ANIMATION MODAL                             -->
+  <!-- ========================================================= -->
+  <div id="chest-modal" class="hidden fixed inset-0 z-40 bg-slate-950/85 backdrop-blur-lg flex items-center justify-center p-4">
+    <div class="ice-glass rounded-3xl max-w-md w-full p-6 text-center border border-cyan-400/40 relative overflow-hidden">
+      <div class="text-xs uppercase tracking-widest text-cyan-400 font-bold mb-2">Открытие контейнера</div>
+      <div id="chest-anim-icon" class="text-6xl my-4 animate-bounce">📦</div>
+      <div id="chest-result-area" class="hidden">
+        <div id="chest-item-rarity" class="inline-block px-3 py-0.5 rounded-full text-xs font-bold border mb-2">РЕДКИЙ</div>
+        <div id="chest-item-preview" class="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-4xl mb-3 shadow-lg border border-white/10">🧊</div>
+        <h3 id="chest-item-name" class="text-xl font-extrabold text-white">Ледяной Кристалл</h3>
+        <p id="chest-item-type" class="text-xs text-slate-400 mt-1">Облик</p>
+        <div id="chest-dup-note" class="hidden mt-2 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg py-1 px-2">
+          Уже в коллекции! Добавлен дубликат в инвентарь.
+        </div>
+        <button id="btn-close-chest" class="mt-5 w-full py-3 rounded-xl font-bold bg-gradient-to-r from-cyan-400 to-indigo-400 text-slate-950 hover:opacity-95 transition cursor-pointer">
+          Забрать награду
+        </button>
+      </div>
+      <div id="chest-opening-text" class="text-sm text-slate-300 animate-pulse">Синтез квантовой материи...</div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MAIN LOBBY & FULL MENU INTERFACE                          -->
+  <!-- ========================================================= -->
+  <div id="main-menu" class="fixed inset-0 z-20 flex flex-col justify-between safe-menu sm:p-5 overflow-hidden bg-gradient-to-b from-slate-950/55 via-slate-950/40 to-slate-950/80">
+    
+    <!-- Top Header Bar -->
+    <header class="ice-glass rounded-2xl px-3 sm:px-5 py-2.5 flex flex-wrap items-center justify-between gap-2 shrink-0">
+      <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('profile')">
+        <div id="header-avatar-wrap" class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl overflow-hidden flex items-center justify-center bg-slate-900 frame-ice shrink-0">
+          <img id="header-avatar-img" src="" alt="Avatar" class="w-full h-full object-cover hidden" />
+          <span id="header-avatar-emoji" class="text-xl">🧊</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span id="header-username" class="font-bold text-sm sm:text-base text-white">Странник Льда</span>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Ур. <span id="header-level">1</span></span>
+          </div>
+          <div class="w-28 sm:w-36 h-1.5 bg-slate-800 rounded-full mt-1 overflow-hidden">
+            <div id="header-xp-bar" class="h-full bg-gradient-to-r from-cyan-400 to-indigo-400" style="width: 10%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hidden lg:flex flex-col items-center">
+        <span class="text-lg font-extrabold tracking-widest bg-gradient-to-r from-cyan-300 via-sky-200 to-indigo-300 bg-clip-text text-transparent">ICE NEBULA</span>
+        <span class="text-[10px] tracking-[0.25em] text-slate-400 uppercase">Космический Дрейф</span>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button id="btn-quick-music" class="ice-card px-2.5 py-2 rounded-xl text-cyan-300 hover:text-white text-sm cursor-pointer" title="Переключить музыку">
+          🎵
+        </button>
+        <div class="bg-slate-900/90 border border-cyan-500/30 px-3 py-1.5 rounded-xl flex items-center gap-2">
+          <span class="text-base">💎</span>
+          <span id="header-crystals" class="font-extrabold text-sm sm:text-base text-cyan-300">150</span>
+        </div>
+        <button onclick="startGame()" class="bg-gradient-to-r from-cyan-400 to-sky-400 hover:from-cyan-300 hover:to-white text-slate-950 font-extrabold px-4 sm:px-6 py-2 rounded-xl shadow-lg shadow-cyan-500/25 active:scale-95 transition text-sm sm:text-base cursor-pointer">
+          ИГРАТЬ
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Viewport (Tabs) -->
+    <main id="menu-content" class="flex-1 my-3 overflow-y-auto rounded-2xl">
+      
+      <!-- TAB: HOME / PLAY -->
+      <section id="tab-play" class="tab-panel h-full flex flex-col justify-between p-2 sm:p-4">
+        <div class="max-w-xl mx-auto text-center my-auto py-4">
+          <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full ice-glass text-xs text-cyan-300 mb-3">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+            <span>120+ космических секторов • 520+ уникальных форм</span>
+          </div>
+          <h1 class="text-3xl sm:text-5xl font-black text-white tracking-tight drop-shadow-[0_4px_24px_rgba(56,189,248,0.35)]">
+            ЛЕДЯНАЯ ТУМАННОСТЬ
+          </h1>
+          <p class="text-slate-300 text-xs sm:text-sm mt-2.5 max-w-md mx-auto leading-relaxed">
+            Управляйте космическим артефактом сквозь метеоритные пояса, открывайте далёкие планеты, собирайте редкие формы и слушайте расслабляющий космо-эмбиент.
+          </p>
+
+          <div class="grid grid-cols-3 gap-2 sm:gap-3 mt-6 text-left">
+            <div onclick="switchTab('inventory')" class="ice-glass p-3 rounded-2xl cursor-pointer hover:border-cyan-400/50 transition">
+              <div class="text-[10px] uppercase text-slate-400">Облик</div>
+              <div id="home-equipped-skin" class="text-xs sm:text-sm font-bold text-cyan-200 truncate mt-0.5">Красный Кварц</div>
+            </div>
+            <div onclick="switchTab('inventory')" class="ice-glass p-3 rounded-2xl cursor-pointer hover:border-cyan-400/50 transition">
+              <div class="text-[10px] uppercase text-slate-400">Компаньон</div>
+              <div id="home-equipped-pet" class="text-xs sm:text-sm font-bold text-indigo-200 truncate mt-0.5">Искра Ориона</div>
+            </div>
+            <div onclick="switchTab('shop')" class="ice-glass p-3 rounded-2xl cursor-pointer hover:border-cyan-400/50 transition">
+              <div class="text-[10px] uppercase text-slate-400">Рекорд</div>
+              <div id="home-best-dist" class="text-xs sm:text-sm font-bold text-emerald-300 truncate mt-0.5">0.00 км</div>
+            </div>
+          </div>
+
+          <button onclick="startGame()" class="mt-6 w-full sm:w-auto px-10 py-4 rounded-2xl font-black text-base sm:text-lg text-slate-950 bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-300 hover:scale-[1.02] active:scale-95 transition shadow-[0_0_35px_rgba(56,189,248,0.45)] cursor-pointer">
+            ЗАПУСТИТЬ ПОЛЁТ 🚀
+          </button>
+        </div>
+      </section>
+
+      <!-- TAB: SHOP -->
+      <section id="tab-shop" class="tab-panel hidden ice-glass p-4 sm:p-5 rounded-2xl min-h-full">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-xl font-extrabold text-white">Космический Магазин</h2>
+            <p class="text-xs text-slate-400">Каждый облик имеет уникальную форму, матовую текстуру и цвет по редкости</p>
+          </div>
+          <div class="flex flex-wrap gap-1.5" id="shop-subtabs">
+            <button onclick="setShopCategory('skins')" data-cat="skins" class="shop-cat-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-500 text-slate-950 cursor-pointer">Облики (100)</button>
+            <button onclick="setShopCategory('pets')" data-cat="pets" class="shop-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 cursor-pointer">Компаньоны</button>
+            <button onclick="setShopCategory('music')" data-cat="music" class="shop-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 cursor-pointer">Музыка и Свой трек</button>
+            <button onclick="setShopCategory('cosmetics')" data-cat="cosmetics" class="shop-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 cursor-pointer">Рамки, Баннеры и Эффекты</button>
+          </div>
+        </div>
+
+        <div id="custom-music-box" class="hidden mb-4 p-4 rounded-2xl bg-gradient-to-r from-indigo-950/80 to-cyan-950/80 border border-cyan-400/30">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div class="text-sm font-bold text-cyan-200 flex items-center gap-2">
+                <span>🎧 Свой космический саундтрек</span>
+                <span class="text-[11px] px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">Премиум: 500 💎</span>
+              </div>
+              <p class="text-xs text-slate-300 mt-1">Загрузите аудиофайл с устройства или вставьте прямую ссылку на MP3/OGG/WAV поток.</p>
+            </div>
+            <div id="custom-music-unlock-area">
+              <button onclick="unlockCustomMusic()" class="px-4 py-2 rounded-xl font-bold text-xs bg-amber-400 hover:bg-amber-300 text-slate-950 transition cursor-pointer">
+                Разблокировать за 500 💎
+              </button>
+            </div>
+          </div>
+          <div id="custom-music-controls" class="hidden mt-3 pt-3 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">Загрузить аудиофайл с устройства:</label>
+              <input type="file" id="custom-audio-file" accept="audio/*" class="text-xs text-slate-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-500 file:text-slate-950 hover:file:bg-cyan-400 cursor-pointer" />
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">Или прямая URL-ссылка на трек:</label>
+              <div class="flex gap-1.5">
+                <input type="text" id="custom-audio-url" placeholder="https://example.com/ambient.mp3" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400" />
+                <button onclick="applyCustomAudioUrl()" class="px-3 py-1.5 rounded-lg bg-cyan-500 text-slate-950 font-bold text-xs cursor-pointer">Вкл</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="shop-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3"></div>
+      </section>
+
+      <!-- TAB: CHESTS -->
+      <section id="tab-chests" class="tab-panel hidden ice-glass p-4 sm:p-5 rounded-2xl min-h-full">
+        <div class="mb-4">
+          <h2 class="text-xl font-extrabold text-white">Квантовые Сундуки</h2>
+          <p class="text-xs text-slate-400">Эксклюзивные артефакты (525+ в базе), редкие компаньоны, мелодии и рамки профиля. Шанс мифических предметов крайне мал!</p>
+        </div>
+        <div id="chests-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5"></div>
+      </section>
+
+      <!-- TAB: INVENTORY -->
+      <section id="tab-inventory" class="tab-panel hidden ice-glass p-4 sm:p-5 rounded-2xl min-h-full">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div>
+            <h2 class="text-xl font-extrabold text-white">Инвентарь и Коллекция</h2>
+            <p class="text-xs text-slate-400">Выбирайте экипировку по разделам или продавайте дубликаты за кристаллы</p>
+          </div>
+          <select id="inv-filter-rarity" onchange="renderInventory()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-1.5 focus:outline-none focus:border-cyan-400">
+            <option value="all">Любая редкость</option>
+            <option value="common">Обычный</option>
+            <option value="rare">Редкий</option>
+            <option value="epic">Эпический</option>
+            <option value="legendary">Легендарный</option>
+            <option value="mythic">Мифический</option>
+          </select>
+        </div>
+
+        <!-- Shop-like Category Navigation Pills -->
+        <div class="flex flex-wrap gap-1.5 mb-3" id="inv-subtabs">
+          <button onclick="setInvCategory('all')" data-cat="all" class="inv-cat-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-500 text-slate-950 cursor-pointer">Все</button>
+          <button onclick="setInvCategory('skin')" data-cat="skin" class="inv-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 cursor-pointer">Облики (Формы)</button>
+          <button onclick="setInvCategory('pet')" data-cat="pet" class="inv-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 cursor-pointer">Компаньоны</button>
+          <button onclick="setInvCategory('music')" data-cat="music" class="inv-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 cursor-pointer">Музыка</button>
+          <button onclick="setInvCategory('frame')" data-cat="frame" class="inv-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 cursor-pointer">Рамки аватара</button>
+          <button onclick="setInvCategory('banner')" data-cat="banner" class="inv-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 cursor-pointer">Баннеры профиля</button>
+          <button onclick="setInvCategory('effect')" data-cat="effect" class="inv-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 cursor-pointer">Эффекты профиля</button>
+        </div>
+
+        <!-- Skin Shape Sub-filters (shown when 'skin' category is active) -->
+        <div id="inv-skin-shapes-bar" class="hidden flex-wrap gap-1.5 mb-4 p-2.5 rounded-xl bg-slate-950/60 border border-cyan-500/20"></div>
+
+        <div id="inventory-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3"></div>
+      </section>
+
+      <!-- TAB: QUESTS -->
+      <section id="tab-quests" class="tab-panel hidden ice-glass p-4 sm:p-5 rounded-2xl min-h-full">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 class="text-xl font-extrabold text-white">Космические Задания</h2>
+            <p class="text-xs text-slate-400">Выполняйте поручения для получения кристаллов и опыта</p>
+          </div>
+          <div class="bg-slate-900/90 border border-cyan-500/30 px-3 py-1.5 rounded-xl text-xs text-cyan-300">
+            Обновление через: <span id="quest-timer" class="font-bold text-white">03:59:59</span>
+          </div>
+        </div>
+        <div id="quests-list" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+      </section>
+
+      <!-- TAB: PROFILE -->
+      <section id="tab-profile" class="tab-panel hidden ice-glass p-4 sm:p-5 rounded-2xl min-h-full">
+        <div id="profile-banner-card" class="rounded-2xl p-5 sm:p-6 relative overflow-hidden border border-white/15 transition-all" style="background: linear-gradient(135deg, #0c4a6e, #1e1b4b);">
+          <div class="relative z-10 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+            <div class="relative group">
+              <div id="profile-avatar-frame" class="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center frame-ice">
+                <img id="profile-avatar-img" src="" alt="Avatar" class="w-full h-full object-cover hidden" />
+                <span id="profile-avatar-emoji" class="text-5xl">🧊</span>
+              </div>
+              <label for="upload-avatar-input" class="mt-2 block text-center text-[11px] font-semibold text-cyan-300 hover:text-white bg-slate-950/80 border border-cyan-500/30 rounded-lg py-1 px-2 cursor-pointer transition">
+                📷 Свой значок
+              </label>
+              <input type="file" id="upload-avatar-input" accept="image/*" class="hidden" />
+            </div>
+
+            <div class="flex-1 text-center sm:text-left">
+              <div class="flex flex-col sm:flex-row items-center gap-2">
+                <input id="profile-name-input" type="text" maxlength="20" value="Странник Льда" class="bg-slate-950/60 border border-white/20 rounded-xl px-3 py-1.5 text-lg font-extrabold text-white text-center sm:text-left focus:outline-none focus:border-cyan-400" />
+                <button onclick="saveProfileName()" class="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs cursor-pointer">Сохранить</button>
+              </div>
+              <div class="text-xs text-cyan-200 mt-2">
+                Уровень пилота: <strong id="prof-lvl-val">1</strong> • Опыт: <strong id="prof-xp-val">0 / 600</strong>
+              </div>
+              <div class="w-full max-w-md h-2 bg-slate-950/70 rounded-full mt-1.5 overflow-hidden mx-auto sm:mx-0">
+                <div id="prof-xp-bar" class="h-full bg-gradient-to-r from-cyan-300 to-indigo-400" style="width: 0%"></div>
+              </div>
+              <div class="flex flex-wrap justify-center sm:justify-start gap-3 mt-3 text-xs text-slate-200">
+                <span class="bg-slate-950/50 px-2.5 py-1 rounded-lg">🌌 Макс. дистанция: <strong id="prof-best-dist">0.00 км</strong></span>
+                <span class="bg-slate-950/50 px-2.5 py-1 rounded-lg">💎 Всего собрано: <strong id="prof-total-crystals">0</strong></span>
+                <span class="bg-slate-950/50 px-2.5 py-1 rounded-lg">🎨 Скинов: <strong id="prof-skins-count">1 / 525</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+            <h3 class="text-sm font-bold text-white mb-2.5">Быстрый выбор значка аватара</h3>
+            <div id="preset-avatars-grid" class="flex flex-wrap gap-2"></div>
+          </div>
+          <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+            <h3 class="text-sm font-bold text-white mb-2.5">Активное оформление профиля</h3>
+            <div class="space-y-2 text-xs">
+              <div class="flex justify-between items-center bg-slate-950/60 p-2.5 rounded-xl">
+                <span class="text-slate-400">Рамка аватара:</span>
+                <span id="prof-eq-frame" class="font-bold text-cyan-300">Ледяное Свечение</span>
+              </div>
+              <div class="flex justify-between items-center bg-slate-950/60 p-2.5 rounded-xl">
+                <span class="text-slate-400">Баннер профиля:</span>
+                <span id="prof-eq-banner" class="font-bold text-indigo-300">Глубокий Космос</span>
+              </div>
+              <div class="flex justify-between items-center bg-slate-950/60 p-2.5 rounded-xl">
+                <span class="text-slate-400">Эффект карточки:</span>
+                <span id="prof-eq-effect" class="font-bold text-emerald-300">Спокойствие</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: LEADERBOARD -->
+      <section id="tab-leaderboard" class="tab-panel hidden ice-glass p-4 sm:p-5 rounded-2xl min-h-full">
+        <div class="mb-4">
+          <h2 class="text-xl font-extrabold text-white">Рейтинг Пилотов Галактики</h2>
+          <p class="text-xs text-slate-400">Ваша позиция среди исследователей Ледяной Туманности по максимальной дистанции</p>
+        </div>
+        <div id="leaderboard-list" class="space-y-2"></div>
+      </section>
+
+      <!-- TAB: SETTINGS -->
+      <section id="tab-settings" class="tab-panel hidden ice-glass p-4 sm:p-5 rounded-2xl min-h-full">
+        <h2 class="text-xl font-extrabold text-white mb-4">Настройки Игры</h2>
+        <div class="max-w-lg space-y-3">
+          <div class="flex items-center justify-between bg-slate-900/70 p-3.5 rounded-2xl border border-slate-800">
+            <div>
+              <div class="text-sm font-bold text-white">Расслабляющая музыка</div>
+              <div class="text-xs text-slate-400">Космический эмбиент на фоне</div>
+            </div>
+            <input type="checkbox" id="set-music" checked onchange="toggleSetting('music', this.checked)" class="w-5 h-5 accent-cyan-400 cursor-pointer" />
+          </div>
+
+          <div class="flex items-center justify-between bg-slate-900/70 p-3.5 rounded-2xl border border-slate-800">
+            <div>
+              <div class="text-sm font-bold text-white">Звуковые эффекты</div>
+              <div class="text-xs text-slate-400">Сбор кристаллов, сундуки, столкновения</div>
+            </div>
+            <input type="checkbox" id="set-sfx" checked onchange="toggleSetting('sfx', this.checked)" class="w-5 h-5 accent-cyan-400 cursor-pointer" />
+          </div>
+
+          <div class="bg-slate-900/70 p-3.5 rounded-2xl border border-slate-800">
+            <div class="flex justify-between text-sm font-bold text-white mb-1">
+              <span>Громкость звука</span>
+              <span id="set-vol-label" class="text-cyan-300">70%</span>
+            </div>
+            <input type="range" id="set-volume" min="0" max="100" value="70" oninput="changeVolume(this.value)" class="w-full accent-cyan-400 cursor-pointer" />
+          </div>
+
+          <div class="flex items-center justify-between bg-slate-900/70 p-3.5 rounded-2xl border border-slate-800">
+            <div>
+              <div class="text-sm font-bold text-white">Качество графики</div>
+              <div class="text-xs text-slate-400">Количество звёзд, частиц и детализация</div>
+            </div>
+            <select id="set-quality" onchange="changeQuality(this.value)" class="bg-slate-950 border border-slate-700 text-xs text-white rounded-xl px-3 py-2">
+              <option value="high">Высокое (Ультра)</option>
+              <option value="medium">Среднее</option>
+              <option value="low">Низкое (Экономия батареи)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="ice-glass rounded-2xl p-1.5 flex items-center justify-around gap-1 shrink-0 overflow-x-auto">
+      <button onclick="switchTab('play')" data-tab="play" class="nav-btn flex-1 min-w-[64px] py-2 px-2 rounded-xl flex flex-col items-center gap-0.5 text-cyan-300 bg-cyan-500/15 font-bold text-[11px] transition cursor-pointer">
+        <span class="text-base">🚀</span><span>Полёт</span>
+      </button>
+      <button onclick="switchTab('shop')" data-tab="shop" class="nav-btn flex-1 min-w-[64px] py-2 px-2 rounded-xl flex flex-col items-center gap-0.5 text-slate-400 hover:text-white font-semibold text-[11px] transition cursor-pointer">
+        <span class="text-base">🛒</span><span>Магазин</span>
+      </button>
+      <button onclick="switchTab('chests')" data-tab="chests" class="nav-btn flex-1 min-w-[64px] py-2 px-2 rounded-xl flex flex-col items-center gap-0.5 text-slate-400 hover:text-white font-semibold text-[11px] transition cursor-pointer">
+        <span class="text-base">📦</span><span>Сундуки</span>
+      </button>
+      <button onclick="switchTab('inventory')" data-tab="inventory" class="nav-btn flex-1 min-w-[64px] py-2 px-2 rounded-xl flex flex-col items-center gap-0.5 text-slate-400 hover:text-white font-semibold text-[11px] transition cursor-pointer">
+        <span class="text-base">🎒</span><span>Инвентарь</span>
+      </button>
+      <button onclick="switchTab('quests')" data-tab="quests" class="nav-btn flex-1 min-w-[64px] py-2 px-2 rounded-xl flex flex-col items-center gap-0.5 text-slate-400 hover:text-white font-semibold text-[11px] transition cursor-pointer">
+        <span class="text-base">🎯</span><span>Задания</span>
+      </button>
+      <button onclick="switchTab('profile')" data-tab="profile" class="nav-btn flex-1 min-w-[64px] py-2 px-2 rounded-xl flex flex-col items-center gap-0.5 text-slate-400 hover:text-white font-semibold text-[11px] transition cursor-pointer">
+        <span class="text-base">👤</span><span>Профиль</span>
+      </button>
+      <button onclick="switchTab('leaderboard')" data-tab="leaderboard" class="nav-btn flex-1 min-w-[64px] py-2 px-2 rounded-xl flex flex-col items-center gap-0.5 text-slate-400 hover:text-white font-semibold text-[11px] transition cursor-pointer">
+        <span class="text-base">🏆</span><span>Рейтинг</span>
+      </button>
+      <button onclick="switchTab('settings')" data-tab="settings" class="nav-btn flex-1 min-w-[64px] py-2 px-2 rounded-xl flex flex-col items-center gap-0.5 text-slate-400 hover:text-white font-semibold text-[11px] transition cursor-pointer">
+        <span class="text-base">⚙️</span><span>Опции</span>
+      </button>
+    </nav>
+  </div>
+
+<script>
+/**
+ * ============================================================================
+ * 1. DATABASE & PROCEDURAL CONTENT GENERATION (525+ Unique Shapes & Matte Skins)
+ * ============================================================================
+ */
+const RARITIES = {
+  common:    { id: 'common',    name: 'Обычный',     color: '#cbd5e1', badgeClass: 'rar-common',    sellBase: 4 },
+  rare:      { id: 'rare',      name: 'Редкий',      color: '#38bdf8', badgeClass: 'rar-rare',      sellBase: 10 },
+  epic:      { id: 'epic',      name: 'Эпический',   color: '#c084fc', badgeClass: 'rar-epic',      sellBase: 25 },
+  legendary: { id: 'legendary', name: 'Легендарный', color: '#facc15', badgeClass: 'rar-legendary', sellBase: 60 },
+  mythic:    { id: 'mythic',    name: 'Мифический',  color: '#fb7185', badgeClass: 'rar-mythic',    sellBase: 150 }
+};
+
+const SKIN_SHAPES_META = [
+  { id: 'all', label: 'Все формы', icon: '✨' },
+  { id: 'cube', label: 'Куб', icon: '🧊' },
+  { id: 'atom', label: 'Ядерный Изотоп', icon: '⚛️' },
+  { id: 'nugget', label: 'Кварц', icon: '💠' },
+  { id: 'crystal', label: 'Кристалл', icon: '💎' },
+  { id: 'sphere', label: 'Шар', icon: '🔮' },
+  { id: 'geodesic_sphere', label: 'Гео-Сфера', icon: '🌐' },
+  { id: 'ringed_orb', label: 'Планета-Шар', icon: '🪐' },
+  { id: 'twin_sphere', label: 'Двойная Сфера', icon: '♊' },
+  { id: 'torus', label: 'Тор', icon: '🍩' },
+  { id: 'reactor', label: 'Реактор', icon: '⚙️' },
+  { id: 'prism', label: 'Призма', icon: '🔺' },
+  { id: 'stellated', label: 'Звезда', icon: '✴️' },
+  { id: 'polyhedron', label: 'Многогранник', icon: '⬡' }
+];
+
+// Generate 560+ Unique Matte & Rainbow Skins with Distinct Shapes & Dedicated Isotope / Cube Branches
+const ALL_SKINS = [];
+(function generateSkinsDatabase() {
+  const prefixes = [
+    'Ледяной', 'Неоновый', 'Квантовый', 'Астральный', 'Кристальный', 'Лунный', 'Солнечный', 'Эфирный',
+    'Галактический', 'Полярный', 'Призрачный', 'Титановый', 'Изумрудный', 'Рубиновый', 'Сапфировый',
+    'Обсидиановый', 'Базальтовый', 'Плазменный', 'Туманный', 'Звёздный', 'Северный', 'Глубинный',
+    'Хрустальный', 'Сумрачный', 'Спектральный', 'Орбитальный', 'Фотон', 'Нейтронный', 'Космический', 'Кобальтовый'
+  ];
+  const nouns = [
+    'Кварц', 'Осколок', 'Монолит', 'Куб', 'Реактор', 'Ядро', 'Свет', 'Импульс', 'Горизонт', 'Кристалл',
+    'Призма', 'Вихрь', 'Маяк', 'Спутник', 'Фантом', 'Изотоп', 'Атом', 'Синтез', 'Ледник', 'Аметист',
+    'Шар', 'Сфера', 'Орбита', 'Тор', 'Пульсар', 'Гиперкуб'
+  ];
+
+  // Featured iconic skins at the start
+  const featuredSkins = [
+    {
+      id: 'skin_0',
+      category: 'skin',
+      name: 'Красный Кварц',
+      rarity: 'common',
+      color: '#dc2626',
+      emissive: '#7f1d1d',
+      shapeType: 'nugget',
+      pattern: 'crystal_facets',
+      ripple: false,
+      isRainbow: false,
+      inShop: true,
+      price: 0,
+      unlockLevel: 0
+    },
+    {
+      id: 'skin_1',
+      category: 'skin',
+      name: 'Ядерный Изотоп: Изумруд',
+      rarity: 'epic',
+      color: '#22c55e',
+      emissive: '#15803d',
+      shapeType: 'atom',
+      pattern: 'radioactive_ripple',
+      ripple: true,
+      isRainbow: false,
+      inShop: true,
+      price: 165,
+      unlockLevel: 0
+    },
+    {
+      id: 'skin_cube_starter',
+      category: 'skin',
+      name: 'Ледяной Куб',
+      rarity: 'common',
+      color: '#38bdf8',
+      emissive: '#0284c7',
+      shapeType: 'cube',
+      pattern: 'circuit_matte',
+      ripple: false,
+      isRainbow: false,
+      inShop: true,
+      price: 45,
+      unlockLevel: 0
+    }
+  ];
+
+  featuredSkins.forEach(s => ALL_SKINS.push(s));
+
+  // Dedicated Nuclear Isotope (Ядерный Изотоп) full color branch across all colors!
+  const isotopeColors = [
+    { name: 'Ядерный Изотоп: Кобальт', color: '#3b82f6', emissive: '#1d4ed8', rarity: 'rare', price: 110, inShop: true },
+    { name: 'Ядерный Изотоп: Рубин', color: '#ef4444', emissive: '#991b1b', rarity: 'rare', price: 125, inShop: true },
+    { name: 'Ядерный Изотоп: Янтарь', color: '#f59e0b', emissive: '#b45309', rarity: 'rare', price: 130, inShop: true },
+    { name: 'Ядерный Изотоп: Бирюза', color: '#06b6d4', emissive: '#0e7490', rarity: 'rare', price: 140, inShop: true },
+    { name: 'Ядерный Изотоп: Аметист', color: '#a855f7', emissive: '#6b21a8', rarity: 'epic', price: 185, inShop: true },
+    { name: 'Ядерный Изотоп: Маджента', color: '#ec4899', emissive: '#9d174d', rarity: 'epic', price: 195, inShop: true },
+    { name: 'Ядерный Изотоп: Солнце', color: '#eab308', emissive: '#a16207', rarity: 'legendary', price: 0, inShop: false },
+    { name: 'Ядерный Изотоп: Сверхновая', color: '#fb7185', emissive: '#be123c', rarity: 'mythic', price: 0, inShop: false }
+  ];
+  isotopeColors.forEach((iso, idx) => {
+    ALL_SKINS.push({
+      id: `skin_isotope_${idx}`,
+      category: 'skin',
+      name: iso.name,
+      rarity: iso.rarity,
+      color: iso.color,
+      emissive: iso.emissive,
+      shapeType: 'atom',
+      pattern: 'radioactive_ripple',
+      ripple: true,
+      isRainbow: false,
+      inShop: iso.inShop,
+      price: iso.price,
+      unlockLevel: 0
+    });
+  });
+
+  for (let i = 2; i < 525; i++) {
+    const p = prefixes[i % prefixes.length];
+    const n = nouns[Math.floor(i / prefixes.length) % nouns.length];
+    const variant = Math.floor(i / (prefixes.length * nouns.length));
+    const name = variant > 0 ? `${p} ${n} MK-${variant + 1}` : `${p} ${n}`;
+
+    let rarity = 'common';
+    if (i >= 485) rarity = 'mythic';
+    else if (i >= 400) rarity = 'legendary';
+    else if (i >= 270) rarity = 'epic';
+    else if (i >= 120) rarity = 'rare';
+
+    // Determine shape from noun & rarity
+    let shapeType = 'polyhedron';
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('куб')) {
+      shapeType = 'cube';
+    } else if (lowerName.includes('шар') || lowerName.includes('пульсар')) {
+      shapeType = 'sphere';
+    } else if (lowerName.includes('сфера')) {
+      shapeType = i % 2 === 0 ? 'geodesic_sphere' : 'twin_sphere';
+    } else if (lowerName.includes('орбита')) {
+      shapeType = 'ringed_orb';
+    } else if (lowerName.includes('тор')) {
+      shapeType = 'torus';
+    } else if (lowerName.includes('атом') || lowerName.includes('изотоп') || lowerName.includes('ядро') || lowerName.includes('синтез')) {
+      shapeType = 'atom';
+    } else if (lowerName.includes('кварц') || lowerName.includes('самородок') || lowerName.includes('осколок') || lowerName.includes('ледник') || lowerName.includes('аметист')) {
+      shapeType = 'nugget';
+    } else if (lowerName.includes('кристалл') || lowerName.includes('призма')) {
+      shapeType = 'crystal';
+    } else if (lowerName.includes('реактор') || lowerName.includes('спутник') || lowerName.includes('вихрь')) {
+      shapeType = 'reactor';
+    } else if (rarity === 'mythic' || rarity === 'legendary') {
+      shapeType = ['stellated', 'atom', 'ringed_orb', 'twin_sphere', 'cube'][i % 5];
+    } else if (rarity === 'epic') {
+      shapeType = ['reactor', 'crystal', 'torus', 'geodesic_sphere', 'cube'][i % 5];
+    } else if (rarity === 'rare') {
+      shapeType = ['nugget', 'prism', 'sphere', 'ringed_orb', 'cube'][i % 5];
+    } else {
+      shapeType = ['nugget', 'prism', 'polyhedron', 'crystal', 'sphere', 'torus', 'geodesic_sphere', 'cube'][i % 8];
+    }
+
+    // Color themed by prefix keywords or procedural palette
+    let hue = (i * 137.508) % 360;
+    if (lowerName.includes('изумруд')) hue = 145;
+    else if (lowerName.includes('рубин')) hue = 350;
+    else if (lowerName.includes('сапфир') || lowerName.includes('кобальт')) hue = 220;
+    else if (lowerName.includes('обсидиан') || lowerName.includes('сумрач')) hue = 265;
+    else if (lowerName.includes('солнеч')) hue = 42;
+    else if (lowerName.includes('ледян') || lowerName.includes('поляр')) hue = 198;
+    else if (lowerName.includes('аметист')) hue = 282;
+
+    const sat = lowerName.includes('обсидиан') ? 32 : (rarity === 'common' ? 58 : 76);
+    const light = lowerName.includes('обсидиан') ? 26 : (rarity === 'mythic' ? 56 : 48);
+    const colorHex = `hsl(${Math.round(hue)}, ${sat}%, ${light}%)`;
+    const emissiveHex = `hsl(${Math.round((hue + 18) % 360)}, ${Math.max(25, sat - 10)}%, ${Math.max(16, light - 22)}%)`;
+
+    const patterns = ['matte_stone', 'crystal_facets', 'radioactive_ripple', 'circuit_matte', 'stardust_matte'];
+    const pattern = shapeType === 'crystal'
+      ? 'crystal_facets'
+      : (lowerName.includes('изотоп') || lowerName.includes('плазм') || lowerName.includes('квантов')
+        ? 'radioactive_ripple'
+        : patterns[i % patterns.length]);
+
+    const ripple = (pattern === 'radioactive_ripple' || rarity === 'mythic' || lowerName.includes('импульс'));
+
+    const inShop = i < 100;
+    const price = inShop ? (25 + (i % 15) * 15 + (rarity === 'rare' ? 60 : 0)) : 0;
+    const unlockLevel = (!inShop && i % 3 === 0) ? Math.min(80, Math.floor((i - 90) / 5) + 2) : 0;
+
+    ALL_SKINS.push({
+      id: `skin_${i}`,
+      category: 'skin',
+      name,
+      rarity,
+      color: colorHex,
+      emissive: emissiveHex,
+      shapeType,
+      pattern,
+      ripple,
+      isRainbow: false,
+      inShop,
+      price,
+      unlockLevel
+    });
+  }
+
+  // Add Dedicated RAINBOW Skins (Legendary & Mythic) for EVERY SINGLE SHAPE!
+  const rainbowShapes = [
+    { shape: 'cube', label: 'Радужный Гиперкуб', rarity: 'mythic' },
+    { shape: 'atom', label: 'Радужный Ядерный Изотоп', rarity: 'mythic' },
+    { shape: 'nugget', label: 'Радужный Кварц', rarity: 'legendary' },
+    { shape: 'crystal', label: 'Радужный Кристалл', rarity: 'legendary' },
+    { shape: 'sphere', label: 'Радужный Шар', rarity: 'legendary' },
+    { shape: 'geodesic_sphere', label: 'Радужная Гео-Сфера', rarity: 'legendary' },
+    { shape: 'ringed_orb', label: 'Радужная Планета-Шар', rarity: 'mythic' },
+    { shape: 'twin_sphere', label: 'Радужная Двойная Сфера', rarity: 'mythic' },
+    { shape: 'torus', label: 'Радужный Тор', rarity: 'legendary' },
+    { shape: 'reactor', label: 'Радужный Реактор', rarity: 'mythic' },
+    { shape: 'prism', label: 'Радужная Призма', rarity: 'legendary' },
+    { shape: 'stellated', label: 'Радужная Звезда', rarity: 'mythic' },
+    { shape: 'polyhedron', label: 'Радужный Многогранник', rarity: 'legendary' }
+  ];
+  rainbowShapes.forEach((rb, idx) => {
+    ALL_SKINS.push({
+      id: `skin_rainbow_${rb.shape}`,
+      category: 'skin',
+      name: rb.label,
+      rarity: rb.rarity,
+      color: '#ec4899',
+      emissive: '#38bdf8',
+      shapeType: rb.shape,
+      pattern: 'radioactive_ripple',
+      ripple: true,
+      isRainbow: true,
+      inShop: false,
+      price: 0,
+      unlockLevel: 0
+    });
+  });
+})();
+
+// 18 Unique Companions
+const ALL_PETS = [
+  { id: 'pet_0', name: 'Искра Ориона', rarity: 'common', color: '#7dd3fc', shape: 'star', price: 0, inShop: true, icon: '✨' },
+  { id: 'pet_1', name: 'Ледяной Светлячок', rarity: 'common', color: '#38bdf8', shape: 'orb', price: 60, inShop: true, icon: '💠' },
+  { id: 'pet_2', name: 'Лунный Осколок', rarity: 'common', color: '#e2e8f0', shape: 'octa', price: 80, inShop: true, icon: '🌙' },
+  { id: 'pet_3', name: 'Мятная Звёздочка', rarity: 'common', color: '#34d399', shape: 'star', price: 95, inShop: true, icon: '🌟' },
+  { id: 'pet_4', name: 'Лазурный Дрон', rarity: 'rare', color: '#0ea5e9', shape: 'ringed', price: 160, inShop: true, icon: '🛸' },
+  { id: 'pet_5', name: 'Аметистовый Дух', rarity: 'rare', color: '#c084fc', shape: 'octa', price: 190, inShop: true, icon: '🔮' },
+  { id: 'pet_6', name: 'Солнечный Зайчик', rarity: 'rare', color: '#facc15', shape: 'star', price: 210, inShop: true, icon: '☀️' },
+  { id: 'pet_7', name: 'Кобальтовый Спутник', rarity: 'rare', color: '#6366f1', shape: 'ringed', price: 240, inShop: true, icon: '🪐' },
+  { id: 'pet_8', name: 'Туманность Андромеды', rarity: 'epic', color: '#e879f9', shape: 'ringed', price: 420, inShop: true, icon: '🌌' },
+  { id: 'pet_9', name: 'Кристалл Вечности', rarity: 'epic', color: '#22d3ee', shape: 'octa', price: 480, inShop: true, icon: '💎' },
+  { id: 'pet_10', name: 'Феникс Пепла', rarity: 'epic', color: '#fb7185', shape: 'star', price: 520, inShop: true, icon: '🔥' },
+  { id: 'pet_11', name: 'Северное Сияние', rarity: 'epic', color: '#2dd4bf', shape: 'orb', price: 550, inShop: true, icon: '🌠' },
+  { id: 'pet_12', name: 'Мини-Уран', rarity: 'legendary', color: '#67e8f9', shape: 'ringed', price: 0, inShop: false, icon: '🪐' },
+  { id: 'pet_13', name: 'Сердце Квазара', rarity: 'legendary', color: '#fde047', shape: 'star', price: 0, inShop: false, icon: '💫' },
+  { id: 'pet_14', name: 'Хранитель Бездны', rarity: 'legendary', color: '#818cf8', shape: 'octa', price: 0, inShop: false, icon: '👁️' },
+  { id: 'pet_15', name: 'Осколок Сверхновой', rarity: 'mythic', color: '#f43f5e', shape: 'star', price: 0, inShop: false, icon: '💥' },
+  { id: 'pet_16', name: 'Архитектор Вселенной', rarity: 'mythic', color: '#38bdf8', shape: 'ringed', price: 0, inShop: false, icon: '💠' },
+  { id: 'pet_17', name: 'Душа Ледяной Звезды', rarity: 'mythic', color: '#a5f3fc', shape: 'star', price: 0, inShop: false, icon: '❄️' },
+  { id: 'pet_rainbow', name: 'Радужная Звёздочка Призмы', rarity: 'mythic', color: '#f472b6', shape: 'star', isRainbow: true, price: 0, inShop: false, icon: '🌈' }
+].map(p => ({ ...p, category: 'pet' }));
+
+// Profile Cosmetics (Frames, Banners, Effects) — Rich Collection
+const ALL_COSMETICS = [
+  // FRAMES (19 unique frames)
+  { id: 'frame_ice', category: 'frame', name: 'Ледяное Свечение', rarity: 'common', cssClass: 'frame-ice', price: 0, inShop: true, icon: '🖼️' },
+  { id: 'frame_steel', category: 'frame', name: 'Орбитальная Сталь', rarity: 'common', cssClass: 'frame-none', price: 55, inShop: true, icon: '🛡️' },
+  { id: 'frame_amber', category: 'frame', name: 'Янтарный Горизонт', rarity: 'common', cssClass: 'frame-amber', price: 85, inShop: true, icon: '🟠' },
+  { id: 'frame_emerald', category: 'frame', name: 'Изумрудный Контур', rarity: 'rare', cssClass: 'frame-emerald', price: 120, inShop: true, icon: '💚' },
+  { id: 'frame_crimson', category: 'frame', name: 'Рубиновый Импульс', rarity: 'rare', cssClass: 'frame-crimson', price: 150, inShop: true, icon: '❤️' },
+  { id: 'frame_neon', category: 'frame', name: 'Неоновый Киберпанк', rarity: 'rare', cssClass: 'frame-neon', price: 180, inShop: true, icon: '💜' },
+  { id: 'frame_cybergrid', category: 'frame', name: 'Квантовая Сетка', rarity: 'rare', cssClass: 'frame-cybergrid', price: 210, inShop: true, icon: '💠' },
+  { id: 'frame_cyanpulse', category: 'frame', name: 'Пульсар Сириуса', rarity: 'epic', cssClass: 'frame-cyanpulse', price: 280, inShop: true, icon: '🌀' },
+  { id: 'frame_fire', category: 'frame', name: 'Солнечная Корона', rarity: 'epic', cssClass: 'frame-fire', price: 320, inShop: true, icon: '🔥' },
+  { id: 'frame_amethyst', category: 'frame', name: 'Аметистовый Кристалл', rarity: 'epic', cssClass: 'frame-amethyst', price: 350, inShop: true, icon: '🔮' },
+  { id: 'frame_void', category: 'frame', name: 'Гравитация Бездны', rarity: 'epic', cssClass: 'frame-void', price: 380, inShop: true, icon: '🌑' },
+  { id: 'frame_plasma', category: 'frame', name: 'Плазменный Реактор', rarity: 'epic', cssClass: 'frame-plasma', price: 420, inShop: true, icon: '⚡' },
+  { id: 'frame_gold', category: 'frame', name: 'Звёздное Золото', rarity: 'legendary', cssClass: 'frame-gold', price: 0, inShop: false, icon: '👑' },
+  { id: 'frame_eclipse', category: 'frame', name: 'Полное Затмение', rarity: 'legendary', cssClass: 'frame-eclipse', price: 0, inShop: false, icon: '🌒' },
+  { id: 'frame_frostcrown', category: 'frame', name: 'Корона Ледяного Гиганта', rarity: 'legendary', cssClass: 'frame-frostcrown', price: 0, inShop: false, icon: '❄️' },
+  { id: 'frame_stardust', category: 'frame', name: 'Звёздная Пыль Вечности', rarity: 'legendary', cssClass: 'frame-stardust', price: 0, inShop: false, icon: '✨' },
+  { id: 'frame_bloodmoon', category: 'frame', name: 'Кровавая Луна Марса', rarity: 'mythic', cssClass: 'frame-bloodmoon', price: 0, inShop: false, icon: '🩸' },
+  { id: 'frame_quantum', category: 'frame', name: 'Квантовый Сингуляр', rarity: 'mythic', cssClass: 'frame-quantum', price: 0, inShop: false, icon: '🌌' },
+  { id: 'frame_singularity', category: 'frame', name: 'Сердце Сверхновой', rarity: 'mythic', cssClass: 'frame-singularity', price: 0, inShop: false, icon: '💥' },
+  { id: 'frame_rainbow', category: 'frame', name: 'Спектр Сверхновой', rarity: 'mythic', cssClass: 'frame-rainbow', price: 0, inShop: false, icon: '🌈' },
+
+  // BANNERS (16 unique banners)
+  { id: 'banner_deep', category: 'banner', name: 'Глубокий Космос', rarity: 'common', bgStyle: 'linear-gradient(135deg, #0c4a6e, #1e1b4b)', price: 0, inShop: true, icon: '🏞️' },
+  { id: 'banner_midnight', category: 'banner', name: 'Ночная Орбита', rarity: 'common', bgStyle: 'linear-gradient(135deg, #090d16, #1e293b, #0f172a)', price: 65, inShop: true, icon: '🌃' },
+  { id: 'banner_glacier', category: 'banner', name: 'Ледники Энцелада', rarity: 'common', bgStyle: 'linear-gradient(135deg, #0e7490, #155e75, #1e1b4b)', price: 95, inShop: true, icon: '🧊' },
+  { id: 'banner_aurora', category: 'banner', name: 'Полярное Сияние', rarity: 'rare', bgStyle: 'linear-gradient(135deg, #064e3b, #0284c7, #312e81)', price: 150, inShop: true, icon: '🌌' },
+  { id: 'banner_mars', category: 'banner', name: 'Пески Марса', rarity: 'rare', bgStyle: 'linear-gradient(135deg, #7f1d1d, #b91c1c, #271313)', price: 175, inShop: true, icon: '🔴' },
+  { id: 'banner_emerald_sea', category: 'banner', name: 'Изумрудный Туман', rarity: 'rare', bgStyle: 'linear-gradient(135deg, #065f46, #047857, #0f172a)', price: 195, inShop: true, icon: '🌿' },
+  { id: 'banner_nebula', category: 'banner', name: 'Розовая Туманность', rarity: 'epic', bgStyle: 'linear-gradient(135deg, #701a75, #311042, #1e1b4b)', price: 290, inShop: true, icon: '🌸' },
+  { id: 'banner_saturn', category: 'banner', name: 'Кольца Сатурна', rarity: 'epic', bgStyle: 'linear-gradient(135deg, #78350f, #b45309, #1e1b4b)', price: 330, inShop: true, icon: '🪐' },
+  { id: 'banner_cyber', category: 'banner', name: 'Неоновый Горизонт', rarity: 'epic', bgStyle: 'linear-gradient(135deg, #311042, #0284c7, #be185d)', price: 370, inShop: true, icon: '⚡' },
+  { id: 'banner_abyss', category: 'banner', name: 'Бездна Тёмной Материи', rarity: 'epic', bgStyle: 'linear-gradient(135deg, #020617, #312e81, #4c1d95)', price: 410, inShop: true, icon: '🕳️' },
+  { id: 'banner_supernova', category: 'banner', name: 'Вспышка Сверхновой', rarity: 'legendary', bgStyle: 'linear-gradient(135deg, #7c2d12, #d97706, #1e1b4b)', price: 0, inShop: false, icon: '☀️' },
+  { id: 'banner_astral', category: 'banner', name: 'Астральный Океан', rarity: 'legendary', bgStyle: 'linear-gradient(135deg, #1d4ed8, #06b6d4, #6d28d9)', price: 0, inShop: false, icon: '🌊' },
+  { id: 'banner_crimson_eclipse', category: 'banner', name: 'Багровое Затмение', rarity: 'legendary', bgStyle: 'linear-gradient(135deg, #450a0a, #dc2626, #090d16)', price: 0, inShop: false, icon: '🩸' },
+  { id: 'banner_icepalace', category: 'banner', name: 'Ледяной Дворец', rarity: 'mythic', bgStyle: 'linear-gradient(135deg, #083344, #0369a1, #38bdf8)', price: 0, inShop: false, icon: '❄️' },
+  { id: 'banner_galaxy_core', category: 'banner', name: 'Ядро Галактики', rarity: 'mythic', bgStyle: 'linear-gradient(135deg, #f59e0b, #db2777, #312e81, #06b6d4)', price: 0, inShop: false, icon: '👑' },
+  { id: 'banner_eternity', category: 'banner', name: 'Хроники Бесконечности', rarity: 'mythic', bgStyle: 'linear-gradient(135deg, #0f172a, #6366f1, #ec4899, #14b8a6)', price: 0, inShop: false, icon: '🌠' },
+
+  // PROFILE EFFECTS (8 unique effects)
+  { id: 'effect_none', category: 'effect', name: 'Спокойствие', rarity: 'common', cssClass: '', price: 0, inShop: true, icon: '✨' },
+  { id: 'effect_pulse', category: 'effect', name: 'Ледяной Пульс', rarity: 'rare', cssClass: 'effect-pulse', price: 200, inShop: true, icon: '💫' },
+  { id: 'effect_voidrift', category: 'effect', name: 'Глубина Бездны', rarity: 'rare', cssClass: 'effect-voidrift', price: 240, inShop: true, icon: '🌑' },
+  { id: 'effect_aurora', category: 'effect', name: 'Перелив Туманности', rarity: 'epic', cssClass: 'effect-aurora', price: 350, inShop: true, icon: '🌊' },
+  { id: 'effect_solarflare', category: 'effect', name: 'Солнечный Протуберанец', rarity: 'epic', cssClass: 'effect-solarflare', price: 420, inShop: true, icon: '🔥' },
+  { id: 'effect_hyperdrive', category: 'effect', name: 'Гиперпрыжок', rarity: 'legendary', cssClass: 'effect-hyperdrive', price: 0, inShop: false, icon: '🚀' },
+  { id: 'effect_supernova', category: 'effect', name: 'Резонанс Сверхновой', rarity: 'mythic', cssClass: 'effect-supernova', price: 0, inShop: false, icon: '💥' },
+  { id: 'frame_prism_rainbow', category: 'frame', name: 'Радужная Призма', rarity: 'mythic', cssClass: 'frame-prism-rainbow', isRainbow: true, price: 0, inShop: false, icon: '🌈' },
+  { id: 'banner_prism_rainbow', category: 'banner', name: 'Радужный Горизонт Вселенной', rarity: 'mythic', bgStyle: 'linear-gradient(120deg, #ef4444, #f59e0b, #10b981, #06b6d4, #6366f1, #ec4899)', isRainbow: true, price: 0, inShop: false, icon: '🌈' },
+  { id: 'effect_rainbow_prism', category: 'effect', name: 'Радужное Сияние', rarity: 'mythic', cssClass: 'effect-rainbow-prism', isRainbow: true, price: 0, inShop: false, icon: '🌈' }
+];
+
+// Diverse Cosmic Music Tracks with Unique Synth Profiles & Melodies
+const ALL_MUSIC = [
+  {
+    id: 'music_0', category: 'music', name: 'Ледяной Дрейф (Базовый)', rarity: 'common', price: 0, inShop: true,
+    style: 'ambient_pad', rootFreq: 110, scale: [1, 1.2, 1.5, 1.8], arp: [2, 3, 2.4, 3], stepMs: 1400, icon: '🎵'
+  },
+  {
+    id: 'music_1', category: 'music', name: 'Колыбельная Сатурна', rarity: 'common', price: 90, inShop: true,
+    style: 'lullaby_bells', rootFreq: 98, scale: [1, 1.25, 1.5, 1.875], arp: [3, 2.5, 2, 1.875, 2.5, 3], stepMs: 1100, icon: '🎶'
+  },
+  {
+    id: 'music_2', category: 'music', name: 'Кристальный Дождь', rarity: 'rare', price: 180, inShop: true,
+    style: 'crystal_arp', rootFreq: 130.81, scale: [1, 1.2, 1.5, 2], arp: [4, 3.6, 3, 2.4, 3, 3.6, 4.8, 4], stepMs: 520, icon: '🎼'
+  },
+  {
+    id: 'music_3', category: 'music', name: 'Шёпот Туманности', rarity: 'rare', price: 220, inShop: true,
+    style: 'deep_nebula', rootFreq: 73.42, scale: [1, 1.333, 1.5, 1.778], arp: [1.5, 1.778, 2, 1.5], stepMs: 1800, icon: '🎹'
+  },
+  {
+    id: 'music_4', category: 'music', name: 'Эхо Квазара', rarity: 'epic', price: 360, inShop: true,
+    style: 'cosmic_pulse', rootFreq: 146.83, scale: [1, 1.189, 1.498, 1.781], arp: [2, 2, 2.996, 2.378, 2, 3.562, 2.996, 2.378], stepMs: 440, icon: '🌌'
+  },
+  {
+    id: 'music_5', category: 'music', name: 'Свет Далёких Звёзд', rarity: 'legendary', price: 0, inShop: false,
+    style: 'starlight_chimes', rootFreq: 164.81, scale: [1, 1.25, 1.5, 1.875], arp: [4, 5, 4.5, 3.75, 3, 3.75], stepMs: 780, icon: '💫'
+  },
+  {
+    id: 'music_6', category: 'music', name: 'Симфония Вечности', rarity: 'mythic', price: 0, inShop: false,
+    style: 'eternity_choir', rootFreq: 110, scale: [1, 1.5, 2, 2.5], arp: [2, 2.5, 3, 4, 3, 2.5], stepMs: 1250, icon: '👑'
+  }
+];
+
+// Thematic Chests
+const CHESTS = [
+  { id: 'chest_ice', name: 'Ледяной Контейнер', icon: '🧊', price: 75, desc: 'Холодные оттенки и базовые формы', weights: { common: 60, rare: 28, epic: 9, legendary: 2.7, mythic: 0.3 }, accent: 'from-cyan-500/20 to-sky-900/40 border-cyan-400/40' },
+  { id: 'chest_neon', name: 'Неоновый Сундук', icon: '💠', price: 150, desc: 'Редкие формы, рамки и мелодии', weights: { common: 35, rare: 42, epic: 17, legendary: 5.2, mythic: 0.8 }, accent: 'from-fuchsia-500/20 to-indigo-900/40 border-fuchsia-400/40' },
+  { id: 'chest_emerald', name: 'Изумрудный Сектор', icon: '🌿', price: 180, desc: 'Изумрудные и природные космические артефакты', weights: { common: 30, rare: 45, epic: 18, legendary: 6, mythic: 1.0 }, accent: 'from-emerald-500/20 to-teal-950/40 border-emerald-400/40' },
+  { id: 'chest_crimson', name: 'Алый Гигант', icon: '🔴', price: 240, desc: 'Огненные и рубиновые редкие коллекции', weights: { common: 20, rare: 45, epic: 25, legendary: 8.5, mythic: 1.5 }, accent: 'from-rose-500/20 to-red-950/50 border-rose-400/40' },
+  { id: 'chest_halloween', name: 'Хэллоуин: Тёмная Материя', icon: '🎃', price: 320, desc: 'Призрачные, фиолетовые и мистические награды', weights: { common: 10, rare: 40, epic: 35, legendary: 12.5, mythic: 2.5 }, accent: 'from-orange-500/20 to-purple-950/50 border-orange-400/40' },
+  { id: 'chest_companion', name: 'Звёздный Инкубатор', icon: '🌟', price: 380, desc: 'Повышенный шанс редких компаньонов-звёздочек!', petBoost: true, weights: { common: 15, rare: 40, epic: 30, legendary: 12, mythic: 3.0 }, accent: 'from-indigo-500/20 to-blue-950/50 border-indigo-400/40' },
+  { id: 'chest_solar', name: 'Солнечная Реликвия', icon: '☀️', price: 520, desc: 'Редчайшие солнечные и плазменные артефакты', weights: { common: 5, rare: 32, epic: 40, legendary: 18.5, mythic: 4.5 }, accent: 'from-yellow-500/20 to-amber-950/50 border-yellow-400/40' },
+  { id: 'chest_mythic', name: 'Сундук Сверхновой', icon: '👑', price: 750, desc: 'Элитный контейнер для охотников за мификами', weights: { common: 0, rare: 25, epic: 45, legendary: 23, mythic: 7.0 }, accent: 'from-amber-400/25 to-rose-950/50 border-amber-300/50' },
+  { id: 'chest_rainbow', name: 'Радужный Призматический Сундук', icon: '🌈', price: 950, desc: 'Гарантированно содержит Легендарные и Мифические Радужные облики, компаньона, рамку, фон и эффект!', rainbowOnly: true, weights: { common: 0, rare: 0, epic: 0, legendary: 55, mythic: 45 }, accent: 'from-pink-500/25 via-cyan-500/20 to-amber-500/25 border-pink-400/60' }
+];
+
+// Rare Planetary Zones (50 km / 100 km / 200 km intervals, lasting 10 km each)
+const PLANETARY_ZONES = [
+  // Interval ~50 km (Standard Planetary Zones)
+  {
+    id: 'zone_mars', name: 'Зона Марса', tierKm: 50, durationKm: 10,
+    planetColor: 0xdc2626, ringColor: 0xf87171, hasRings: false,
+    bgHex: 0x180707, fogHex: 0x260a0a,
+    meteorColors: [0x7f1d1d, 0x991b1b, 0x5c1919, 0x6b211a],
+    crystalColor: 0xfca5a5, crystalEmissive: 0xef4444,
+    crystalBonusMult: 1.25,
+    fact: 'На Марсе находится гора Олимп — самый высокий вулкан в Солнечной системе (высотой более 21 км).'
+  },
+  {
+    id: 'zone_uranus', name: 'Орбита Урана', tierKm: 50, durationKm: 10,
+    planetColor: 0x38bdf8, ringColor: 0xbae6fd, hasRings: true,
+    bgHex: 0x05131f, fogHex: 0x081e30,
+    meteorColors: [0x1e3a5f, 0x0369a1, 0x164e63, 0x1e293b],
+    crystalColor: 0xa5f3fc, crystalEmissive: 0x06b6d4,
+    crystalBonusMult: 1.25,
+    fact: 'На Уране и Нептуне в глубине атмосферы идут настоящие дожди из алмазов.'
+  },
+  {
+    id: 'zone_saturn', name: 'Кольца Сатурна', tierKm: 50, durationKm: 10,
+    planetColor: 0xf59e0b, ringColor: 0xfde68a, hasRings: true,
+    bgHex: 0x171005, fogHex: 0x241808,
+    meteorColors: [0x78350f, 0x92400e, 0x573318, 0x451a03],
+    crystalColor: 0xfef08a, crystalEmissive: 0xeab308,
+    crystalBonusMult: 1.28,
+    fact: 'Кольца Сатурна состоят на 99% из чистого водяного льда и космической пыли.'
+  },
+  // Interval ~100 km (Rare Planetary Zones)
+  {
+    id: 'zone_kepler', name: 'Изумрудный Кеплер-442b', tierKm: 100, durationKm: 10,
+    planetColor: 0x10b981, ringColor: 0x6ee7b7, hasRings: false,
+    bgHex: 0x041711, fogHex: 0x07261c,
+    meteorColors: [0x064e3b, 0x065f46, 0x134e4a, 0x1e293b],
+    crystalColor: 0x6ee7b7, crystalEmissive: 0x10b981,
+    crystalBonusMult: 1.38,
+    fact: 'Кеплер-442b — одна из самых землеподобных экзопланет, находящаяся в зоне обитаемости своей звезды.'
+  },
+  {
+    id: 'zone_venus', name: 'Вулканическая Венера', tierKm: 100, durationKm: 10,
+    planetColor: 0xf97316, ringColor: 0xfdba74, hasRings: false,
+    bgHex: 0x1c0b04, fogHex: 0x2c1106,
+    meteorColors: [0x7c2d12, 0x9a3412, 0x431407, 0x572613],
+    crystalColor: 0xfed7aa, crystalEmissive: 0xf97316,
+    crystalBonusMult: 1.38,
+    fact: 'Один день на Венере длится дольше, чем целый венерианский год вокруг Солнца.'
+  },
+  // Interval ~200 km (Ultra-Rare Exotic Planetary Zones)
+  {
+    id: 'zone_amethyst_giant', name: 'Аметистовый Гигант Астралия', tierKm: 200, durationKm: 10,
+    planetColor: 0xa855f7, ringColor: 0xe9d5ff, hasRings: true,
+    bgHex: 0x12061f, fogHex: 0x1e0a33,
+    meteorColors: [0x4c1d95, 0x581c87, 0x3b0764, 0x311042],
+    crystalColor: 0xf3e8ff, crystalEmissive: 0xc084fc,
+    crystalBonusMult: 1.55,
+    fact: 'В атмосферах горячих газовых гигантов ветры могут разгоняться до 8 000 километров в час.'
+  },
+  {
+    id: 'zone_crimson_eclipse', name: 'Багровый Мир Немезида', tierKm: 200, durationKm: 10,
+    planetColor: 0xf43f5e, ringColor: 0xfda4af, hasRings: true,
+    bgHex: 0x1c040b, fogHex: 0x2d0612,
+    meteorColors: [0x881337, 0x9f1239, 0x4c0519, 0x5c1125],
+    crystalColor: 0xffe4e6, crystalEmissive: 0xf43f5e,
+    crystalBonusMult: 1.6,
+    fact: 'Нейтронная звезда настолько плотна, что чайная ложка её вещества весит миллиарды тонн.'
+  }
+];
+
+const WISE_QUOTES = [
+  '«Мы сделаны из звёздного вещества.» — Карл Саган',
+  '«Воображение важнее знания, ибо знание ограничено.» — Альберт Эйнштейн',
+  '«Смотрите на звёзды, а не себе под ноги.» — Стивен Хокинг',
+  '«Тот, кто не смотрит вперёд, оказывается позади.» — Джордано Бруно',
+  '«Тишина космоса учит нас слышать собственные мысли.»',
+  '«Даже самая маленькая искра способна осветить бесконечную тьму.»',
+  '«Вселенная не обязана быть понятной нам с первого взгляда.» — Нил Деграсс Тайсон',
+  '«Познание начинается с удивления.» — Аристотель',
+  '«Каждый кристалл опыта приближает тебя к новым горизонтам.»',
+  '«Спокойствие ума — лучший навигатор среди метеоритных бурь.»'
+];
+
+const PRESET_AVATARS = ['🧊', '🚀', '🌌', '🪐', '✨', '❄️', '💎', '🛸', '🌟', '☄️', '🔮', '👑'];
+
+/**
+ * ============================================================================
+ * 2. PLAYER STATE & PERSISTENT STORAGE
+ * ============================================================================
+ */
+const STORAGE_KEY = 'ice_nebula_save_v2';
+
+const DEFAULT_PLAYER_STATE = {
+  username: 'Странник Льда',
+  avatarEmoji: '🧊',
+  avatarCustomDataUrl: '',
+  crystals: 150,
+  totalCrystalsCollected: 0,
+  level: 1,
+  xp: 0,
+  bestDistance: 0,
+  totalDistance: 0,
+  chestsOpened: 0,
+  equippedSkin: 'skin_0',
+  equippedPet: 'pet_0',
+  equippedFrame: 'frame_ice',
+  equippedBanner: 'banner_deep',
+  equippedEffect: 'effect_none',
+  equippedMusic: 'music_0',
+  customMusicUnlocked: false,
+  customMusicUrl: '',
+  inventory: {
+    skin_0: 1,
+    pet_0: 1,
+    frame_ice: 1,
+    banner_deep: 1,
+    effect_none: 1,
+    music_0: 1
+  },
+  quests: [],
+  questResetTime: 0,
+  settings: {
+    music: true,
+    sfx: true,
+    volume: 0.7,
+    quality: 'high'
+  }
+};
+
+let player = loadPlayerData();
+
+function loadPlayerData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return JSON.parse(JSON.stringify(DEFAULT_PLAYER_STATE));
+    const parsed = JSON.parse(raw);
+    return {
+      ...JSON.parse(JSON.stringify(DEFAULT_PLAYER_STATE)),
+      ...parsed,
+      inventory: { ...DEFAULT_PLAYER_STATE.inventory, ...(parsed.inventory || {}) },
+      settings: { ...DEFAULT_PLAYER_STATE.settings, ...(parsed.settings || {}) }
+    };
+  } catch (e) {
+    return JSON.parse(JSON.stringify(DEFAULT_PLAYER_STATE));
+  }
+}
+
+function savePlayerData() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(player));
+  } catch (e) {}
+}
+
+function getRequiredXp(lvl) {
+  return Math.floor(600 * Math.pow(1.38, lvl - 1));
+}
+
+function addXp(amount) {
+  player.xp += amount;
+  let req = getRequiredXp(player.level);
+  let leveledUp = false;
+
+  while (player.xp >= req) {
+    player.xp -= req;
+    player.level += 1;
+    leveledUp = true;
+    req = getRequiredXp(player.level);
+
+    ALL_SKINS.forEach(s => {
+      if (s.unlockLevel > 0 && s.unlockLevel <= player.level && !player.inventory[s.id]) {
+        player.inventory[s.id] = 1;
+      }
+    });
+  }
+
+  if (leveledUp) {
+    audio.playSfx('chest');
+    showToast(`⭐ Новый уровень пилота: ${player.level}! Открыты новые облики!`, 'info');
+  }
+}
+
+/**
+ * ============================================================================
+ * 3. DIVERSE COSMIC AMBIENT SYNTH ENGINE (Distinct Melodies, Chords & Timbres)
+ * ============================================================================
+ */
+class CosmicAudioEngine {
+  constructor() {
+    this.ctx = null;
+    this.masterGain = null;
+    this.musicTimer = null;
+    this.stepIndex = 0;
+    this.customAudioEl = null;
+    this.isPlayingMusic = false;
+  }
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        this.ctx = new AudioCtx();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = player.settings.volume;
+        this.masterGain.connect(this.ctx.destination);
+      }
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+  }
+
+  setVolume(vol) {
+    if (this.masterGain && this.ctx) {
+      this.masterGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.05);
+    }
+    if (this.customAudioEl) {
+      this.customAudioEl.volume = vol;
+    }
+  }
+
+  startMusic(overrideTrack = null) {
+    if (!player.settings.music && !overrideTrack) return;
+    this.init();
+    this.stopMusic();
+
+    if (!overrideTrack && player.equippedMusic === 'music_custom' && player.customMusicUrl) {
+      try {
+        this.customAudioEl = new Audio(player.customMusicUrl);
+        this.customAudioEl.loop = true;
+        this.customAudioEl.volume = player.settings.volume;
+        this.customAudioEl.play().catch(() => {});
+        this.isPlayingMusic = true;
+        return;
+      } catch (e) {}
+    }
+
+    const track = overrideTrack || ALL_MUSIC.find(m => m.id === player.equippedMusic) || ALL_MUSIC[0];
+    this.isPlayingMusic = true;
+    this.stepIndex = 0;
+
+    const playStep = () => {
+      if (!this.isPlayingMusic || !this.ctx) return;
+      const now = this.ctx.currentTime;
+      const idx = this.stepIndex++;
+      const chordMult = track.scale[Math.floor(idx / 2) % track.scale.length];
+      const arpMult = track.arp[idx % track.arp.length];
+
+      // 1. Warm Bass / Pad layer (every 2 steps)
+      if (idx % 2 === 0) {
+        const bassOsc = this.ctx.createOscillator();
+        const bassGain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+
+        bassOsc.type = track.style === 'deep_nebula' ? 'sawtooth' : (track.style === 'cosmic_pulse' ? 'triangle' : 'sine');
+        bassOsc.frequency.setValueAtTime(track.rootFreq * chordMult, now);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(track.style === 'deep_nebula' ? 340 : 650, now);
+
+        const dur = (track.stepMs / 1000) * 2.2;
+        bassGain.gain.setValueAtTime(0.0001, now);
+        bassGain.gain.linearRampToValueAtTime(0.085, now + Math.min(0.6, dur * 0.3));
+        bassGain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+        bassOsc.connect(filter);
+        filter.connect(bassGain);
+        bassGain.connect(this.masterGain);
+        bassOsc.start(now);
+        bassOsc.stop(now + dur + 0.05);
+      }
+
+      // 2. Melodic Arpeggio / Bell / Chime layer (Distinct per track style)
+      const leadOsc = this.ctx.createOscillator();
+      const leadGain = this.ctx.createGain();
+
+      if (track.style === 'crystal_arp' || track.style === 'starlight_chimes') {
+        leadOsc.type = 'sine';
+      } else if (track.style === 'cosmic_pulse') {
+        leadOsc.type = 'triangle';
+      } else if (track.style === 'eternity_choir') {
+        leadOsc.type = 'sawtooth';
+      } else {
+        leadOsc.type = 'sine';
+      }
+
+      const noteFreq = track.rootFreq * arpMult;
+      leadOsc.frequency.setValueAtTime(noteFreq, now);
+      if (track.style === 'lullaby_bells') {
+        leadOsc.frequency.exponentialRampToValueAtTime(noteFreq * 1.003, now + 0.8);
+      }
+
+      const leadFilter = this.ctx.createBiquadFilter();
+      leadFilter.type = 'lowpass';
+      leadFilter.frequency.setValueAtTime(track.style === 'eternity_choir' ? 900 : 1800, now);
+
+      const noteDur = track.style === 'crystal_arp' ? 0.75 : (track.stepMs / 1000) * 1.45;
+      const peakGain = track.style === 'cosmic_pulse' ? 0.06 : 0.048;
+
+      leadGain.gain.setValueAtTime(0.0001, now);
+      leadGain.gain.linearRampToValueAtTime(peakGain, now + (track.style === 'crystal_arp' ? 0.04 : 0.25));
+      leadGain.gain.exponentialRampToValueAtTime(0.0001, now + noteDur);
+
+      leadOsc.connect(leadFilter);
+      leadFilter.connect(leadGain);
+      leadGain.connect(this.masterGain);
+      leadOsc.start(now);
+      leadOsc.stop(now + noteDur + 0.05);
+
+      // 3. Subtle cosmic shimmer harmonic on off-beats for richer tracks
+      if ((track.style === 'starlight_chimes' || track.style === 'eternity_choir') && idx % 3 === 1) {
+        const harmOsc = this.ctx.createOscillator();
+        const harmGain = this.ctx.createGain();
+        harmOsc.type = 'sine';
+        harmOsc.frequency.setValueAtTime(noteFreq * 1.5, now);
+        harmGain.gain.setValueAtTime(0.0001, now);
+        harmGain.gain.linearRampToValueAtTime(0.025, now + 0.15);
+        harmGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.4);
+        harmOsc.connect(harmGain);
+        harmGain.connect(this.masterGain);
+        harmOsc.start(now);
+        harmOsc.stop(now + 1.45);
+      }
+    };
+
+    playStep();
+    this.musicTimer = setInterval(playStep, track.stepMs);
+  }
+
+  stopMusic() {
+    this.isPlayingMusic = false;
+    if (this.musicTimer) {
+      clearInterval(this.musicTimer);
+      this.musicTimer = null;
+    }
+    if (this.customAudioEl) {
+      this.customAudioEl.pause();
+      this.customAudioEl = null;
+    }
+  }
+
+  playSfx(type) {
+    if (!player.settings.sfx) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    if (type === 'crystal') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(660, now);
+      osc.frequency.exponentialRampToValueAtTime(1180, now + 0.16);
+      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + 0.24);
+    } else if (type === 'crash') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, now);
+      osc.frequency.exponentialRampToValueAtTime(34, now + 0.45);
+      gain.gain.setValueAtTime(0.28, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + 0.5);
+    } else if (type === 'chest' || type === 'sun') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.setValueAtTime(554.37, now + 0.09);
+      osc.frequency.setValueAtTime(659.25, now + 0.18);
+      osc.frequency.setValueAtTime(880, now + 0.27);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + 0.58);
+    }
+  }
+}
+
+const audio = new CosmicAudioEngine();
+
+/**
+ * ============================================================================
+ * 4. THREE.JS 3D WORLD, MATTE PROCEDURAL SKIN TEXTURES & UNIQUE 3D SHAPES
+ * ============================================================================
+ */
+let scene, camera, renderer;
+let playerGroup, playerAvatarRoot, playerLight, playerRimLight;
+let activeSkinAnimator = null; // Stores references for atom electron rings or ripple animation
+let companionGroup, companionMesh, companionLight;
+let starField, dustField, speedLinesGroup, trailGroup, planetsGroup, obstaclesGroup, crystalsGroup, particlesGroup, sunEventMesh;
+
+// Cache generated matte textures per skin id
+const skinTextureCache = new Map();
+
+// Shared Geometries & Materials
+let sharedMeteorGeos = [];
+let sharedMeteorMats = [];
+let sharedCrystalGeo, sharedCrystalMat;
+let sharedParticleGeo, sharedRingGeo;
+let sharedNebulaTexture;
+
+const meteorPool = [];
+const crystalPool = [];
+const particlePool = [];
+const shockwavePool = [];
+const trailPool = [];
+let trailSpawnTimer = 0;
+
+let gameState = 'menu';
+let runDistance = 0;
+let zoneCycleDistance = 0;
+let runCrystals = 0;
+let runXp = 0;
+let activePlanetZone = null;
+let planetEventRemainingSec = 0;
+let nextPlanetTriggerKm = 50;
+let targetBgColor = new THREE.Color(0x040812);
+let targetFogColor = new THREE.Color(0x050c1d);
+const CLASSIC_METEOR_COLORS = [0x334155, 0x475569, 0x1e293b, 0x3b4252, 0x293548];
+let baseSpeed = 23;
+let targetX = 0, targetY = 0;
+let currentX = 0, currentY = 0;
+let cameraShakeIntensity = 0;
+
+let lastFrameTime = 0;
+let fpsEma = 60;
+let currentDynamicDpr = null;
+const _tmpVecA = new THREE.Vector3();
+const _tmpVecB = new THREE.Vector3();
+const _tmpColorA = new THREE.Color();
+const _tmpColorB = new THREE.Color();
+const _whiteColor = new THREE.Color(0xffffff);
+let lastHudCrystals = -1;
+let lastHudDistStr = '';
+let lastHudLevel = -1;
+let lastHudXpStr = '';
+let lastHudQuestStr = '';
+let obstacleSpawnTimer = 0;
+let crystalSpawnTimer = 0;
+let sunSpawnCooldown = 18;
+let companionQuoteTimer = 25;
+let companionSpeechHideTimeout = null;
+let companionMagnetTarget = null;
+
+// Procedural Matte Surface Texture Generator for Skins
+function getSkinMatteTexture(skin) {
+  if (skinTextureCache.has(skin.id)) {
+    return skinTextureCache.get(skin.id);
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+
+  if (skin.shapeType === 'cube') {
+    // Solid uniform color without white spots or white-out gradients
+    ctx.fillStyle = skin.color;
+    ctx.fillRect(0, 0, 128, 128);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    skinTextureCache.set(skin.id, tex);
+    return tex;
+  }
+
+  // Intense light-bulb radial fill: bright incandescent core radiating vibrant color
+  const radGrad = ctx.createRadialGradient(64, 64, 4, 64, 64, 76);
+  radGrad.addColorStop(0, '#ffffff');
+  radGrad.addColorStop(0.28, skin.color);
+  radGrad.addColorStop(0.85, skin.color);
+  radGrad.addColorStop(1, skin.emissive || skin.color);
+  ctx.fillStyle = radGrad;
+  ctx.fillRect(0, 0, 128, 128);
+
+  // Deterministic pseudo-random seed from skin id
+  let seed = 0;
+  for (let i = 0; i < skin.id.length; i++) seed = (seed * 31 + skin.id.charCodeAt(i)) % 10000;
+  const rand = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+
+  if (skin.pattern === 'radioactive_ripple') {
+    // Subtle organic energy waves / isotope ripple
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.lineWidth = 2;
+    for (let y = 8; y < 128; y += 14) {
+      ctx.beginPath();
+      for (let x = 0; x <= 128; x += 8) {
+        const wy = y + Math.sin(x * 0.12 + y * 0.2) * 3;
+        if (x === 0) ctx.moveTo(x, wy);
+        else ctx.lineTo(x, wy);
+      }
+      ctx.stroke();
+    }
+    for (let i = 0; i < 45; i++) {
+      ctx.fillStyle = rand() > 0.5 ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)';
+      ctx.fillRect(rand() * 124, rand() * 124, 3, 3);
+    }
+  } else if (skin.pattern === 'crystal_facets') {
+    // Symmetrical precision-cut diamond/crystal refraction geometry & specular facet sheen
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.34)';
+    ctx.lineWidth = 1.5;
+    for (let ring = 16; ring <= 64; ring += 16) {
+      ctx.beginPath();
+      for (let s = 0; s <= 6; s++) {
+        const a = (s / 6) * Math.PI * 2;
+        const px = 64 + Math.cos(a) * ring;
+        const py = 64 + Math.sin(a) * ring;
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    for (let s = 0; s < 6; s++) {
+      const a = (s / 6) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(64, 64);
+      ctx.lineTo(64 + Math.cos(a) * 64, 64 + Math.sin(a) * 64);
+      ctx.stroke();
+    }
+  } else if (skin.pattern === 'circuit_matte') {
+    // Tech geometric lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 12; i++) {
+      const x = Math.floor(rand() * 8) * 16;
+      const y = Math.floor(rand() * 8) * 16;
+      ctx.strokeRect(x + 2, y + 2, 12, 12);
+    }
+  } else {
+    // Natural matte mineral grain (for nuggets, rocks, stardust)
+    for (let i = 0; i < 260; i++) {
+      ctx.fillStyle = rand() > 0.5 ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.14)';
+      const sz = 1 + rand() * 3.5;
+      ctx.fillRect(rand() * 128, rand() * 128, sz, sz);
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  skinTextureCache.set(skin.id, tex);
+  return tex;
+}
+
+// Builds a unique 3D Matte Mesh Group based on Skin Shape & Rarity
+function buildUniquePlayerShape(skin) {
+  const root = new THREE.Group();
+  const baseColor = new THREE.Color(skin.color);
+  const matteTex = getSkinMatteTexture(skin);
+  const isPureCube = skin.shapeType === 'cube';
+
+  // For cube: solid uniform color without white spots or white-wash
+  const bulbTint = isPureCube
+    ? baseColor.clone()
+    : new THREE.Color(0xffffff).lerp(baseColor, 0.22);
+  const matteMat = new THREE.MeshBasicMaterial({
+    color: bulbTint,
+    map: matteTex
+  });
+
+  let coreGlowSprite = null;
+  if (!isPureCube) {
+    // Inner hot bulb core glow sprite (bright white-tinted center)
+    const coreGlowColor = baseColor.clone().lerp(new THREE.Color(0xffffff), 0.65);
+    const coreGlowMat = new THREE.SpriteMaterial({
+      map: sharedNebulaTexture,
+      color: coreGlowColor,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    coreGlowSprite = new THREE.Sprite(coreGlowMat);
+    coreGlowSprite.scale.set(2.4, 2.4, 1);
+    root.add(coreGlowSprite);
+  }
+
+  // Outer wide radiant light-bulb halo (solid hue for cube, no white spots)
+  const auraColor = isPureCube
+    ? baseColor.clone()
+    : baseColor.clone().lerp(new THREE.Color(0xffffff), 0.25);
+  const auraMat = new THREE.SpriteMaterial({
+    map: sharedNebulaTexture,
+    color: auraColor,
+    transparent: true,
+    opacity: isPureCube ? 0.35 : 0.68,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+  const auraSprite = new THREE.Sprite(auraMat);
+  auraSprite.scale.set(isPureCube ? 3.4 : 4.8, isPureCube ? 3.4 : 4.8, 1);
+  root.add(auraSprite);
+
+  const animator = {
+    type: skin.shapeType,
+    rings: [],
+    coreMesh: null,
+    auraSprite,
+    coreGlowSprite,
+    baseScale: 1,
+    ripple: skin.ripple,
+    isRainbow: !!skin.isRainbow,
+    matteMat
+  };
+
+  if (skin.shapeType === 'cube') {
+    // Cube flying CORNER-FORWARD (углом вперёд!) with solid uniform color & zero white spots
+    const cubePivot = new THREE.Group();
+    const boxGeo = new THREE.BoxGeometry(0.84, 0.84, 0.84);
+    const boxMesh = new THREE.Mesh(boxGeo, matteMat);
+    // Rotate 45 deg on Y and ~35.26 deg on X so a vertex corner points straight forward along -Z!
+    boxMesh.rotation.set(Math.atan(Math.SQRT1_2), Math.PI / 4, 0);
+    cubePivot.add(boxMesh);
+
+    root.add(cubePivot);
+    animator.coreMesh = cubePivot;
+  } else if (skin.shapeType === 'atom') {
+    // Atom / Isotope: Bright glowing bulb core + luminous electron rings + glowing electrons
+    const coreGeo = new THREE.IcosahedronGeometry(0.46, 3);
+    const coreMesh = new THREE.Mesh(coreGeo, matteMat);
+    root.add(coreMesh);
+    animator.coreMesh = coreMesh;
+
+    const ringColor = baseColor.clone().lerp(new THREE.Color(0xffffff), 0.45);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: ringColor,
+      transparent: true,
+      opacity: 0.95
+    });
+    const electronColor = baseColor.clone().lerp(new THREE.Color(0xffffff), 0.75);
+    const electronMat = new THREE.MeshBasicMaterial({
+      color: electronColor
+    });
+
+    const ringCount = skin.rarity === 'mythic' ? 4 : 3;
+    for (let r = 0; r < ringCount; r++) {
+      const orbitPivot = new THREE.Group();
+      orbitPivot.rotation.set((r * Math.PI) / ringCount, (r * Math.PI) / 3, r * 0.5);
+
+      const torusGeo = new THREE.TorusGeometry(0.76, 0.028, 10, 36);
+      const torus = new THREE.Mesh(torusGeo, ringMat);
+      orbitPivot.add(torus);
+
+      const electron = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 12), electronMat);
+      electron.position.set(0.76, 0, 0);
+      orbitPivot.add(electron);
+
+      root.add(orbitPivot);
+      animator.rings.push(orbitPivot);
+    }
+  } else if (skin.shapeType === 'nugget') {
+    // Sleek Faceted Quartz Gem Cluster (clean double-terminated hexagonal crystal + twin crystal)
+    const quartzCluster = new THREE.Group();
+    const mainSpire = new THREE.Mesh(new THREE.OctahedronGeometry(0.66, 0), matteMat);
+    mainSpire.scale.set(0.76, 1.32, 0.76);
+    quartzCluster.add(mainSpire);
+
+    const sideSpire1 = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 0), matteMat);
+    sideSpire1.scale.set(0.68, 1.18, 0.68);
+    sideSpire1.position.set(0.32, -0.1, 0.14);
+    sideSpire1.rotation.set(0.18, 0.3, -0.38);
+    quartzCluster.add(sideSpire1);
+
+    const sideSpire2 = new THREE.Mesh(new THREE.OctahedronGeometry(0.36, 0), matteMat);
+    sideSpire2.scale.set(0.68, 1.12, 0.68);
+    sideSpire2.position.set(-0.3, -0.14, -0.12);
+    sideSpire2.rotation.set(-0.15, -0.2, 0.4);
+    quartzCluster.add(sideSpire2);
+
+    root.add(quartzCluster);
+    animator.coreMesh = quartzCluster;
+  } else if (skin.shapeType === 'crystal') {
+    // Precision-Cut Royal Solitaire Diamond / Hexagonal Bipyramid Crystal (sleek & symmetrical)
+    const crystalPivot = new THREE.Group();
+
+    // Upper crown pyramid + lower pavilion pyramid welded into a razor-sharp faceted gem
+    const topCone = new THREE.Mesh(new THREE.ConeGeometry(0.56, 0.72, 6), matteMat);
+    topCone.position.y = 0.36;
+
+    const botCone = new THREE.Mesh(new THREE.ConeGeometry(0.56, 0.86, 6), matteMat);
+    botCone.rotation.x = Math.PI;
+    botCone.position.y = -0.43;
+
+    crystalPivot.add(topCone, botCone);
+
+    // Crisp glowing diamond facet edges for jewel-like clarity
+    const topEdges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(topCone.geometry),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })
+    );
+    topEdges.position.copy(topCone.position);
+
+    const botEdges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(botCone.geometry),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })
+    );
+    botEdges.position.copy(botCone.position);
+    botEdges.rotation.copy(botCone.rotation);
+
+    crystalPivot.add(topEdges, botEdges);
+
+    // Subtle floating diamond girdle halo for epic/legendary/mythic crystals
+    if (skin.rarity !== 'common') {
+      const girdleGeo = new THREE.RingGeometry(0.64, 0.71, 6);
+      const girdleMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.48
+      });
+      const girdle = new THREE.Mesh(girdleGeo, girdleMat);
+      girdle.rotation.x = Math.PI / 2;
+      crystalPivot.add(girdle);
+    }
+
+    root.add(crystalPivot);
+    animator.coreMesh = crystalPivot;
+  } else if (skin.shapeType === 'reactor') {
+    // Multi-part Octahedral Core with Stabilizer Ring
+    const coreGeo = new THREE.OctahedronGeometry(0.56, 0);
+    const coreMesh = new THREE.Mesh(coreGeo, matteMat);
+    root.add(coreMesh);
+    animator.coreMesh = coreMesh;
+
+    const ringGeo = new THREE.TorusGeometry(0.75, 0.065, 8, 24);
+    const ringMesh = new THREE.Mesh(ringGeo, matteMat);
+    ringMesh.rotation.x = Math.PI * 0.42;
+    root.add(ringMesh);
+    animator.rings.push(ringMesh);
+  } else if (skin.shapeType === 'stellated') {
+    // Mythic / Legendary Star Polyhedron
+    const m1 = new THREE.Mesh(new THREE.OctahedronGeometry(0.68, 0), matteMat);
+    const m2 = new THREE.Mesh(new THREE.OctahedronGeometry(0.68, 0), matteMat);
+    m2.rotation.set(Math.PI / 4, Math.PI / 4, 0);
+    root.add(m1, m2);
+    animator.coreMesh = m1;
+  } else if (skin.shapeType === 'prism') {
+    // Triangular / Hexagonal Matte Prism
+    const prismGeo = new THREE.ConeGeometry(0.66, 1.25, 5);
+    const prismMesh = new THREE.Mesh(prismGeo, matteMat);
+    root.add(prismMesh);
+    animator.coreMesh = prismMesh;
+  } else if (skin.shapeType === 'sphere') {
+    // Smooth Luminous Sphere (Шар)
+    const sphereGeo = new THREE.SphereGeometry(0.64, 32, 32);
+    const sphereMesh = new THREE.Mesh(sphereGeo, matteMat);
+    root.add(sphereMesh);
+    animator.coreMesh = sphereMesh;
+  } else if (skin.shapeType === 'geodesic_sphere') {
+    // Faceted Geodesic Sphere (Геодезическая сфера)
+    const geoSphere = new THREE.IcosahedronGeometry(0.66, 1);
+    const geoMesh = new THREE.Mesh(geoSphere, matteMat);
+    root.add(geoMesh);
+    animator.coreMesh = geoMesh;
+  } else if (skin.shapeType === 'ringed_orb') {
+    // Planet-like Sphere with Tilted Ring (Шар с кольцом)
+    const orbMesh = new THREE.Mesh(new THREE.SphereGeometry(0.52, 28, 28), matteMat);
+    root.add(orbMesh);
+    animator.coreMesh = orbMesh;
+
+    const ringGeo = new THREE.RingGeometry(0.68, 0.96, 36);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: baseColor.clone().lerp(new THREE.Color(0xffffff), 0.35),
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85
+    });
+    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+    ringMesh.rotation.x = Math.PI * 0.36;
+    ringMesh.rotation.y = 0.28;
+    root.add(ringMesh);
+    animator.rings.push(ringMesh);
+  } else if (skin.shapeType === 'torus') {
+    // Energy Torus / Donut Ring (Тор)
+    const torusGeo = new THREE.TorusGeometry(0.52, 0.22, 18, 36);
+    const torusMesh = new THREE.Mesh(torusGeo, matteMat);
+    torusMesh.rotation.x = 0.35;
+    root.add(torusMesh);
+    animator.coreMesh = torusMesh;
+  } else if (skin.shapeType === 'twin_sphere') {
+    // Binary Twin Spheres orbiting each other (Двойная сфера)
+    const pivot = new THREE.Group();
+    const s1 = new THREE.Mesh(new THREE.SphereGeometry(0.38, 24, 24), matteMat);
+    s1.position.set(-0.36, 0.14, 0);
+    const s2 = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 24), matteMat);
+    s2.position.set(0.38, -0.16, 0);
+    pivot.add(s1, s2);
+    root.add(pivot);
+    animator.coreMesh = pivot;
+    animator.rings.push(pivot);
+  } else {
+    // Sculpted Matte Polyhedron (Icosahedron)
+    const polyGeo = new THREE.IcosahedronGeometry(0.65, 0);
+    const polyMesh = new THREE.Mesh(polyGeo, matteMat);
+    root.add(polyMesh);
+    animator.coreMesh = polyMesh;
+  }
+
+  return { root, animator };
+}
+
+function createGlowSpriteTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+  grad.addColorStop(0.22, 'rgba(224, 242, 254, 0.78)');
+  grad.addColorStop(0.55, 'rgba(56, 189, 248, 0.32)');
+  grad.addColorStop(1, 'rgba(4, 8, 18, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+
+function initSharedAssetsAndPools() {
+  sharedNebulaTexture = createGlowSpriteTexture();
+
+  const rockTones = [0x334155, 0x475569, 0x1e293b, 0x3b4252, 0x293548];
+  sharedMeteorMats = rockTones.map(col => new THREE.MeshStandardMaterial({
+    color: col,
+    roughness: 0.85,
+    metalness: 0.12,
+    flatShading: true
+  }));
+
+  for (let g = 0; g < 4; g++) {
+    const geo = new THREE.IcosahedronGeometry(1.0, 2);
+    const posAttr = geo.attributes.position;
+    const v = new THREE.Vector3();
+    const seed = (g + 1) * 19.37;
+    for (let i = 0; i < posAttr.count; i++) {
+      v.fromBufferAttribute(posAttr, i);
+      const n = Math.sin(v.x * 3.1 + seed) * Math.cos(v.y * 3.4 + seed) * Math.sin(v.z * 2.9 + seed);
+      const crater = Math.abs(Math.sin(v.x * 5.2 - seed) * Math.cos(v.z * 5.0 + seed));
+      v.multiplyScalar(1 + n * 0.22 - crater * 0.14);
+      posAttr.setXYZ(i, v.x, v.y, v.z);
+    }
+    geo.computeVertexNormals();
+    sharedMeteorGeos.push(geo);
+  }
+
+  sharedCrystalGeo = new THREE.OctahedronGeometry(0.46, 0);
+  sharedCrystalGeo.scale(0.8, 1.48, 0.8);
+  sharedCrystalMat = new THREE.MeshStandardMaterial({
+    color: 0x67e8f9,
+    emissive: 0x06b6d4,
+    emissiveIntensity: 0.85,
+    roughness: 0.25,
+    metalness: 0.15
+  });
+
+  sharedParticleGeo = new THREE.OctahedronGeometry(0.14, 0);
+  sharedRingGeo = new THREE.RingGeometry(0.35, 0.52, 28);
+
+  for (let i = 0; i < 45; i++) {
+    const m = new THREE.Mesh(sharedMeteorGeos[i % 4], sharedMeteorMats[i % sharedMeteorMats.length]);
+    m.visible = false;
+    m.userData = { active: false, radius: 1, rotSpeed: new THREE.Vector3() };
+    obstaclesGroup.add(m);
+    meteorPool.push(m);
+  }
+
+  for (let i = 0; i < 30; i++) {
+    const c = new THREE.Mesh(sharedCrystalGeo, sharedCrystalMat);
+    c.visible = false;
+    c.userData = { active: false, radius: 0.78 };
+    crystalsGroup.add(c);
+    crystalPool.push(c);
+  }
+
+  for (let i = 0; i < 90; i++) {
+    const mat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 1 });
+    const p = new THREE.Mesh(sharedParticleGeo, mat);
+    p.visible = false;
+    p.userData = { active: false, vel: new THREE.Vector3(), life: 0, maxLife: 1 };
+    particlesGroup.add(p);
+    particlePool.push(p);
+  }
+
+  for (let i = 0; i < 12; i++) {
+    const mat = new THREE.MeshBasicMaterial({ color: 0x67e8f9, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+    const ring = new THREE.Mesh(sharedRingGeo, mat);
+    ring.visible = false;
+    ring.userData = { active: false, life: 0 };
+    particlesGroup.add(ring);
+    shockwavePool.push(ring);
+  }
+
+  const trailGeo = new THREE.OctahedronGeometry(0.28, 0);
+  for (let i = 0; i < 24; i++) {
+    const tMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.0 });
+    const tMesh = new THREE.Mesh(trailGeo, tMat);
+    tMesh.visible = false;
+    tMesh.userData = { active: false, life: 0 };
+    trailGroup.add(tMesh);
+    trailPool.push(tMesh);
+  }
+}
+
+function initThreeWorld() {
+  const canvas = document.getElementById('game-canvas');
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x040812);
+  scene.fog = new THREE.FogExp2(0x050c1d, 0.0095);
+
+  camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 320);
+  camera.position.set(0, 2.2, 8.5);
+  camera.lookAt(0, 0.4, -10);
+
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: !isMobile,
+    powerPreference: 'high-performance',
+    stencil: false,
+    depth: true
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  // Cap initial pixel ratio on mobile GPUs (e.g., Mali-G57 on Galaxy A15) so full visual effects run at locked 60fps
+  const baseMaxDpr = isMobile ? 1.35 : 2.0;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, baseMaxDpr));
+
+  // Balanced lighting so matte textures and facets read clearly
+  const hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x0f172a, 0.85);
+  scene.add(hemiLight);
+
+  const dirLight = new THREE.DirectionalLight(0xf8fafc, 1.05);
+  dirLight.position.set(14, 22, 16);
+  scene.add(dirLight);
+
+  const rimBackLight = new THREE.DirectionalLight(0x818cf8, 0.5);
+  rimBackLight.position.set(-15, -10, -25);
+  scene.add(rimBackLight);
+
+  planetsGroup = new THREE.Group();
+  obstaclesGroup = new THREE.Group();
+  crystalsGroup = new THREE.Group();
+  particlesGroup = new THREE.Group();
+  trailGroup = new THREE.Group();
+  speedLinesGroup = new THREE.Group();
+  scene.add(planetsGroup, obstaclesGroup, crystalsGroup, particlesGroup, trailGroup, speedLinesGroup);
+
+  initSharedAssetsAndPools();
+  createStarfield();
+  createMicroDustAndNebulae();
+  createSpeedLines();
+  createPlayerCube();
+  createCompanion();
+
+  enterOpenDeepSpace(false);
+
+  window.addEventListener('resize', onWindowResize);
+  setupControls();
+}
+
+function createStarfield() {
+  if (starField) {
+    starField.geometry.dispose();
+    starField.material.dispose();
+    scene.remove(starField);
+  }
+  const count = player.settings.quality === 'low' ? 1000 : (player.settings.quality === 'medium' ? 2000 : 3400);
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+
+  const palette = [
+    new THREE.Color(0xe0f2fe),
+    new THREE.Color(0x67e8f9),
+    new THREE.Color(0xc4b5fd),
+    new THREE.Color(0xffffff),
+    new THREE.Color(0xbae6fd)
+  ];
+
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 240;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 150;
+    positions[i * 3 + 2] = -Math.random() * 270 + 20;
+
+    const c = palette[i % palette.length];
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.52,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.92
+  });
+
+  starField = new THREE.Points(geo, mat);
+  scene.add(starField);
+}
+
+function createMicroDustAndNebulae() {
+  if (dustField) {
+    dustField.geometry.dispose();
+    dustField.material.dispose();
+    scene.remove(dustField);
+  }
+  const dustCount = player.settings.quality === 'low' ? 180 : 420;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(dustCount * 3);
+  for (let i = 0; i < dustCount; i++) {
+    pos[i * 3] = (Math.random() - 0.5) * 28;
+    pos[i * 3 + 1] = (Math.random() - 0.5) * 18;
+    pos[i * 3 + 2] = -Math.random() * 120 + 10;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0x7dd3fc,
+    size: 0.16,
+    transparent: true,
+    opacity: 0.55
+  });
+  dustField = new THREE.Points(geo, mat);
+  scene.add(dustField);
+
+  const nebulaColors = [0x0ea5e9, 0x6366f1, 0x22d3ee, 0x38bdf8];
+  for (let i = 0; i < 6; i++) {
+    const sMat = new THREE.SpriteMaterial({
+      map: sharedNebulaTexture,
+      color: nebulaColors[i % nebulaColors.length],
+      transparent: true,
+      opacity: 0.18,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const sprite = new THREE.Sprite(sMat);
+    sprite.position.set((Math.random() - 0.5) * 90, (Math.random() - 0.5) * 45, -95 - i * 28);
+    sprite.scale.set(55, 55, 1);
+    scene.add(sprite);
+  }
+}
+
+function createSpeedLines() {
+  const lineGeo = new THREE.BoxGeometry(0.03, 0.03, 4.5);
+  const lineMat = new THREE.MeshBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.22 });
+  for (let i = 0; i < 18; i++) {
+    const mesh = new THREE.Mesh(lineGeo, lineMat);
+    const angle = (i / 18) * Math.PI * 2;
+    const rad = 8.5 + Math.random() * 4.5;
+    mesh.position.set(Math.cos(angle) * rad, Math.sin(angle) * rad * 0.65, -Math.random() * 110);
+    speedLinesGroup.add(mesh);
+  }
+}
+
+function createPlayerCube() {
+  if (playerGroup) scene.remove(playerGroup);
+  playerGroup = new THREE.Group();
+
+  playerLight = new THREE.PointLight(0x38bdf8, 5.2, 42);
+  playerLight.position.set(0, 0.2, 0.3);
+  playerGroup.add(playerLight);
+
+  playerRimLight = new THREE.PointLight(0x67e8f9, 2.8, 28);
+  playerRimLight.position.set(0, -0.4, -1.8);
+  playerGroup.add(playerRimLight);
+
+  scene.add(playerGroup);
+  applyEquippedSkinVisuals();
+}
+
+function applyEquippedSkinVisuals() {
+  if (!playerGroup) return;
+  if (playerAvatarRoot) {
+    playerGroup.remove(playerAvatarRoot);
+  }
+
+  const skin = ALL_SKINS.find(s => s.id === player.equippedSkin) || ALL_SKINS[0];
+  const built = buildUniquePlayerShape(skin);
+  playerAvatarRoot = built.root;
+  activeSkinAnimator = built.animator;
+  playerGroup.add(playerAvatarRoot);
+
+  const col = new THREE.Color(skin.color);
+  const em = new THREE.Color(skin.emissive);
+  playerLight.color.copy(col);
+  if (playerRimLight) playerRimLight.color.copy(em);
+}
+
+function createCompanion() {
+  if (companionGroup) scene.remove(companionGroup);
+  companionGroup = new THREE.Group();
+
+  const geo = new THREE.OctahedronGeometry(0.32, 0);
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x7dd3fc,
+    emissive: 0x38bdf8,
+    emissiveIntensity: 0.75,
+    roughness: 0.75
+  });
+  companionMesh = new THREE.Mesh(geo, mat);
+  companionGroup.add(companionMesh);
+
+  companionLight = new THREE.PointLight(0x7dd3fc, 1.4, 10);
+  companionGroup.add(companionLight);
+
+  companionGroup.position.set(1.65, 0.85, 0);
+  scene.add(companionGroup);
+  applyEquippedCompanionVisuals();
+}
+
+function applyEquippedCompanionVisuals() {
+  if (!companionMesh) return;
+  const pet = ALL_PETS.find(p => p.id === player.equippedPet) || ALL_PETS[0];
+  if (companionMesh.geometry) companionMesh.geometry.dispose();
+
+  if (pet.shape === 'orb') companionMesh.geometry = new THREE.SphereGeometry(0.28, 16, 16);
+  else if (pet.shape === 'ringed') companionMesh.geometry = new THREE.TorusKnotGeometry(0.2, 0.06, 48, 8);
+  else if (pet.shape === 'star') companionMesh.geometry = new THREE.DodecahedronGeometry(0.3, 0);
+  else companionMesh.geometry = new THREE.OctahedronGeometry(0.32, 0);
+
+  companionMesh.userData.isRainbow = !!pet.isRainbow;
+  const col = new THREE.Color(pet.color);
+  companionMesh.material.color.copy(col);
+  companionMesh.material.emissive.copy(col);
+  companionLight.color.copy(col);
+}
+
+function spawnPooledMeteor() {
+  const mesh = meteorPool.find(m => !m.userData.active);
+  if (!mesh) return;
+
+  const scale = 0.72 + Math.random() * 0.78;
+  mesh.scale.setScalar(scale);
+  mesh.position.set((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 8.5, -118);
+  mesh.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+  mesh.userData.active = true;
+  mesh.userData.radius = scale * 0.82;
+  mesh.userData.rotSpeed.set(
+    (Math.random() - 0.5) * 2.2,
+    (Math.random() - 0.5) * 2.2,
+    (Math.random() - 0.5) * 2.2
+  );
+  mesh.visible = true;
+}
+
+function spawnPooledCrystal() {
+  const mesh = crystalPool.find(c => !c.userData.active);
+  if (!mesh) return;
+
+  mesh.position.set((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 7, -118);
+  mesh.rotation.set(0, Math.random() * 6, 0);
+  mesh.userData.active = true;
+  mesh.visible = true;
+}
+
+function rollNextPlanetTriggerKm(fromKm) {
+  // Chance-based encounter roll: may trigger around 50 km, or skip 50/100/150 km and trigger at 200 km (or later).
+  // Counter resets on every new roll / zone exit.
+  const r = Math.random();
+  let step;
+  if (r < 0.35) {
+    step = 50; // May appear on ~50 km
+  } else if (r < 0.65) {
+    step = 100; // Skips 50 km
+  } else if (r < 0.85) {
+    step = 150; // Skips 50 and 100 km
+  } else {
+    step = 200; // Skips 50, 100, and 150 km -> triggers at 200 km
+  }
+  // Small natural jitter so it feels like a live chance rather than a rigid metronome
+  const jitter = (Math.random() - 0.5) * 8;
+  return Math.max(25, fromKm + step + jitter);
+}
+
+function applyZoneVisualTheme(zone) {
+  if (zone) {
+    targetBgColor.setHex(zone.bgHex);
+    targetFogColor.setHex(zone.fogHex);
+    for (let i = 0; i < sharedMeteorMats.length; i++) {
+      sharedMeteorMats[i].color.setHex(zone.meteorColors[i % zone.meteorColors.length]);
+    }
+    sharedCrystalMat.color.setHex(zone.crystalColor);
+    sharedCrystalMat.emissive.setHex(zone.crystalEmissive);
+  } else {
+    targetBgColor.setHex(0x040812);
+    targetFogColor.setHex(0x050c1d);
+    for (let i = 0; i < sharedMeteorMats.length; i++) {
+      sharedMeteorMats[i].color.setHex(CLASSIC_METEOR_COLORS[i % CLASSIC_METEOR_COLORS.length]);
+    }
+    sharedCrystalMat.color.setHex(0x67e8f9);
+    sharedCrystalMat.emissive.setHex(0x06b6d4);
+  }
+}
+
+const SUN_SECTOR_EVENT = {
+  id: 'zone_sun_event',
+  name: 'Солнечная Корона (+85% 💎)',
+  isSunEvent: true,
+  tierKm: 50,
+  durationKm: 10,
+  planetColor: 0xfde047,
+  ringColor: 0xfb923c,
+  hasRings: false,
+  bgHex: 0x261a03,
+  fogHex: 0x3b2605,
+  meteorColors: [0x92400e, 0xb45309, 0x78350f, 0xa16207],
+  crystalColor: 0xfef08a,
+  crystalEmissive: 0xfacc15,
+  crystalBonusMult: 1.85,
+  fact: 'Температура ядра Солнца достигает 15 миллионов градусов, а его свет долетает до Земли за 8 минут 20 секунд!'
+};
+
+function triggerPlanetaryEvent() {
+  // Very rare chance (~3.5%) on ANY kilometer milestone (50, 100, 150, 200, etc.) to trigger the golden Sun Event!
+  let zone;
+  if (Math.random() < 0.035) {
+    zone = SUN_SECTOR_EVENT;
+  } else {
+    const r = Math.random();
+    const desiredTier = r < 0.55 ? 50 : (r < 0.88 ? 100 : 200);
+    const candidates = PLANETARY_ZONES.filter(z => z.tierKm === desiredTier);
+    zone = candidates[Math.floor(Math.random() * candidates.length)] || PLANETARY_ZONES[0];
+  }
+
+  activePlanetZone = zone;
+  // Random duration between 50 seconds (50s) and 2 minutes 10 seconds (130s), hidden from player
+  planetEventRemainingSec = 50 + Math.random() * 80;
+  applyZoneVisualTheme(zone);
+
+  if (zone.isSunEvent) {
+    document.getElementById('hud-zone').textContent = `☀️ ${zone.name}`;
+    showToast('☀️ РЕДЧАЙШЕЕ СОБЫТИЕ: Сектор Солнца! Всё озарено золотым светом, кристаллы +85%!', 'info');
+  } else {
+    document.getElementById('hud-zone').textContent = `🪐 ${zone.name}`;
+    showToast(`🪐 Вы вошли в сектор: ${zone.name}!`, 'info');
+  }
+
+  // Remove any leftover background planet
+  while (planetsGroup.children.length) {
+    planetsGroup.remove(planetsGroup.children[0]);
+  }
+
+  // Huge majestic background planet / glowing Sun (purely visual backdrop, no collision)
+  const pGroup = new THREE.Group();
+  const radius = zone.isSunEvent ? 29 : 26;
+  const planetGeo = new THREE.SphereGeometry(radius, 40, 40);
+  const planetMat = zone.isSunEvent
+    ? new THREE.MeshBasicMaterial({ color: 0xfef08a })
+    : new THREE.MeshStandardMaterial({
+        color: zone.planetColor,
+        emissive: zone.planetColor,
+        emissiveIntensity: 0.24,
+        roughness: 0.85,
+        metalness: 0.05
+      });
+  const planetMesh = new THREE.Mesh(planetGeo, planetMat);
+  pGroup.add(planetMesh);
+
+  const atmoMat = new THREE.SpriteMaterial({
+    map: sharedNebulaTexture,
+    color: zone.isSunEvent ? 0xfacc15 : zone.planetColor,
+    transparent: true,
+    opacity: zone.isSunEvent ? 0.95 : 0.45,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+  const atmoSprite = new THREE.Sprite(atmoMat);
+  atmoSprite.scale.set(radius * (zone.isSunEvent ? 4.4 : 3.2), radius * (zone.isSunEvent ? 4.4 : 3.2), 1);
+  pGroup.add(atmoSprite);
+
+  if (zone.isSunEvent) {
+    // Extra outer solar corona glow + warm light illuminating the scene
+    const outerCoronaMat = new THREE.SpriteMaterial({
+      map: sharedNebulaTexture,
+      color: 0xf97316,
+      transparent: true,
+      opacity: 0.65,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const outerCorona = new THREE.Sprite(outerCoronaMat);
+    outerCorona.scale.set(radius * 6.2, radius * 6.2, 1);
+    pGroup.add(outerCorona);
+
+    const solarBeacon = new THREE.PointLight(0xfacc15, 3.2, 260);
+    pGroup.add(solarBeacon);
+  }
+
+  if (zone.hasRings) {
+    const ringGeo = new THREE.RingGeometry(radius * 1.32, radius * 2.15, 56);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: zone.ringColor,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.42
+    });
+    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+    ringMesh.rotation.x = Math.PI * 0.38;
+    ringMesh.rotation.y = -0.25;
+    pGroup.add(ringMesh);
+  }
+
+  const side = Math.random() > 0.5 ? 1 : -1;
+  pGroup.position.set(side * 38, 6, -195);
+  pGroup.userData = { rotY: 0.04, side, retiring: false };
+  planetsGroup.add(pGroup);
+
+  triggerCompanionSpeech(`🪐 ${zone.name}: ${zone.fact}`, 8000);
+}
+
+function enterOpenDeepSpace(notify = false) {
+  activePlanetZone = null;
+  applyZoneVisualTheme(null);
+  document.getElementById('hud-zone').textContent = 'Глубокий Космос';
+
+  // Smoothly retire background planet
+  planetsGroup.children.forEach(p => {
+    p.userData.retiring = true;
+  });
+
+  if (notify) {
+    showToast('🌌 Сектор планеты пройден — снова открытый космос', 'info');
+  }
+}
+
+let bonusPortals = [];
+let portalSpawnCooldown = 12;
+
+function spawnRareSunEvent() {
+  if (sunEventMesh) return;
+  const portalGroup = new THREE.Group();
+
+  // Brightly glowing HOLLOW ring frame ("Светлый Портал")
+  const torusGeo = new THREE.TorusGeometry(3.4, 0.24, 18, 56);
+  const torusMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const ringFrame = new THREE.Mesh(torusGeo, torusMat);
+  portalGroup.add(ringFrame);
+
+  // Thin outer halo ring so the center remains completely hollow & transparent
+  const outerHaloGeo = new THREE.RingGeometry(3.25, 4.15, 56);
+  const outerHaloMat = new THREE.MeshBasicMaterial({
+    color: 0xfef08a,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.38,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+  const outerHalo = new THREE.Mesh(outerHaloGeo, outerHaloMat);
+  portalGroup.add(outerHalo);
+
+  const portalLight = new THREE.PointLight(0xfef08a, 5.5, 55);
+  portalGroup.add(portalLight);
+
+  portalGroup.position.set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 3, -155);
+  sunEventMesh = portalGroup;
+  scene.add(sunEventMesh);
+  showToast('✨ Впереди редчайшая аномалия — Светлый Портал! Пролетите сквозь него!', 'info');
+}
+
+function spawnColoredBonusPortal() {
+  if (bonusPortals.length >= 2) return;
+  // Rarity roll: rarer = better & smaller ring
+  const r = Math.random();
+  let cfg;
+  if (r < 0.62) {
+    // Rare Blue: larger ring (radius 2.35), 5 - 15 crystals
+    cfg = {
+      rarity: 'rare',
+      label: 'Синий Портал (Редкий)',
+      radius: 2.35,
+      tube: 0.16,
+      color: 0x38bdf8,
+      glowColor: 0x0ea5e9,
+      minCrystals: 5,
+      maxCrystals: 15
+    };
+  } else if (r < 0.90) {
+    // Epic Purple: medium ring (radius 1.75), 15 - 25 crystals
+    cfg = {
+      rarity: 'epic',
+      label: 'Фиолетовый Портал (Эпический)',
+      radius: 1.75,
+      tube: 0.15,
+      color: 0xc084fc,
+      glowColor: 0x9333ea,
+      minCrystals: 15,
+      maxCrystals: 25
+    };
+  } else {
+    // Legendary Yellow: smallest ring (radius 1.25), 25 - 40 crystals
+    cfg = {
+      rarity: 'legendary',
+      label: 'Жёлтый Портал (Легендарный)',
+      radius: 1.25,
+      tube: 0.14,
+      color: 0xfacc15,
+      glowColor: 0xeab308,
+      minCrystals: 25,
+      maxCrystals: 40
+    };
+  }
+
+  const pGroup = new THREE.Group();
+  const ringMesh = new THREE.Mesh(
+    new THREE.TorusGeometry(cfg.radius, cfg.tube, 16, 48),
+    new THREE.MeshBasicMaterial({ color: cfg.color })
+  );
+  pGroup.add(ringMesh);
+
+  // Hollow ring aura around the rim only (completely open/hollow inside)
+  const rimHalo = new THREE.Mesh(
+    new THREE.RingGeometry(cfg.radius * 0.92, cfg.radius * 1.32, 48),
+    new THREE.MeshBasicMaterial({
+      color: cfg.glowColor,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.36,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    })
+  );
+  pGroup.add(rimHalo);
+
+  pGroup.position.set((Math.random() - 0.5) * 9.5, (Math.random() - 0.5) * 5.2, -135);
+  pGroup.userData = cfg;
+  scene.add(pGroup);
+  bonusPortals.push(pGroup);
+}
+
+function spawnExplosionParticles(pos, colorHex, count = 20, withShockwave = false) {
+  const actualCount = player.settings.quality === 'low' ? Math.floor(count * 0.5) : count;
+  let spawned = 0;
+
+  for (let i = 0; i < particlePool.length && spawned < actualCount; i++) {
+    const p = particlePool[i];
+    if (!p.userData.active) {
+      p.material.color.setHex(colorHex);
+      p.material.opacity = 1;
+      p.position.copy(pos);
+      p.userData.vel.set(
+        (Math.random() - 0.5) * 13,
+        (Math.random() - 0.5) * 13,
+        (Math.random() - 0.5) * 13
+      );
+      const life = 0.55 + Math.random() * 0.4;
+      p.userData.life = life;
+      p.userData.maxLife = life;
+      p.userData.active = true;
+      p.visible = true;
+      spawned++;
+    }
+  }
+
+  if (withShockwave) {
+    const ring = shockwavePool.find(r => !r.userData.active);
+    if (ring) {
+      ring.material.color.setHex(colorHex);
+      ring.material.opacity = 0.9;
+      ring.position.copy(pos);
+      ring.scale.setScalar(0.5);
+      ring.userData.life = 0.45;
+      ring.userData.active = true;
+      ring.visible = true;
+    }
+  }
+}
+
+function triggerCompanionSpeech(text, durationMs = 6500) {
+  const el = document.getElementById('companion-speech');
+  if (!el) return;
+  el.textContent = text;
+  el.style.opacity = '1';
+  if (companionSpeechHideTimeout) clearTimeout(companionSpeechHideTimeout);
+  companionSpeechHideTimeout = setTimeout(() => {
+    el.style.opacity = '0';
+  }, durationMs);
+}
+
+function updateCompanionSpeechPosition() {
+  const el = document.getElementById('companion-speech');
+  if (!el || el.style.opacity === '0' || !companionGroup || !camera) return;
+
+  companionGroup.getWorldPosition(_tmpVecB);
+  _tmpVecB.y += 0.68;
+  _tmpVecB.project(camera);
+
+  const rawX = (_tmpVecB.x * 0.5 + 0.5) * window.innerWidth;
+  const rawY = (-(_tmpVecB.y * 0.5) + 0.5) * window.innerHeight;
+
+  const halfW = (el.offsetWidth || 160) * 0.5 + 12;
+  const clampedX = Math.max(halfW, Math.min(window.innerWidth - halfW, rawX));
+  const clampedY = Math.max(54, rawY);
+
+  el.style.left = `${clampedX}px`;
+  el.style.top = `${clampedY}px`;
+}
+
+/**
+ * ============================================================================
+ * 5. CONTROLS
+ * ============================================================================
+ */
+const keysPressed = {};
+let isPointerDown = false;
+let pointerStartX = 0, pointerStartY = 0;
+let baseTargetX = 0, baseTargetY = 0;
+
+function setupControls() {
+  window.addEventListener('keydown', (e) => {
+    keysPressed[e.code] = true;
+    if (e.code === 'Escape' && gameState === 'playing') pauseGame();
+  });
+  window.addEventListener('keyup', (e) => {
+    keysPressed[e.code] = false;
+  });
+
+  const canvas = document.getElementById('game-canvas');
+
+  // Unlock WebAudio on first user gesture (required by iOS Safari)
+  const unlockIosAudio = () => {
+    if (audio && audio.ctx && audio.ctx.state === 'suspended') {
+      audio.ctx.resume().catch(() => {});
+    }
+  };
+  window.addEventListener('touchstart', unlockIosAudio, { passive: true });
+  window.addEventListener('pointerdown', unlockIosAudio, { passive: true });
+
+  const handleStartDrag = (clientX, clientY) => {
+    if (gameState !== 'playing') return;
+    isPointerDown = true;
+    pointerStartX = clientX;
+    pointerStartY = clientY;
+    baseTargetX = targetX;
+    baseTargetY = targetY;
+  };
+
+  const handleMoveDrag = (clientX, clientY) => {
+    if (!isPointerDown || gameState !== 'playing') return;
+    const dx = (clientX - pointerStartX) / (window.innerWidth * 0.40);
+    const dy = -(clientY - pointerStartY) / (window.innerHeight * 0.40);
+    targetX = Math.max(-6.5, Math.min(6.5, baseTargetX + dx * 7.5));
+    targetY = Math.max(-3.6, Math.min(4.2, baseTargetY + dy * 5.5));
+  };
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') return; // handled by dedicated touch listeners on iOS
+    handleStartDrag(e.clientX, e.clientY);
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch') return;
+    handleMoveDrag(e.clientX, e.clientY);
+  });
+
+  window.addEventListener('pointerup', () => { isPointerDown = false; });
+  window.addEventListener('pointercancel', () => { isPointerDown = false; });
+
+  // Dedicated non-passive touch listeners for smooth 60fps iPhone control without Safari rubber-banding
+  canvas.addEventListener('touchstart', (e) => {
+    if (gameState === 'playing') e.preventDefault();
+    if (e.touches && e.touches.length > 0) {
+      handleStartDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    if (gameState === 'playing') e.preventDefault();
+    if (e.touches && e.touches.length > 0) {
+      handleMoveDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', () => { isPointerDown = false; }, { passive: true });
+  canvas.addEventListener('touchcancel', () => { isPointerDown = false; }, { passive: true });
+}
+
+function onWindowResize() {
+  if (!camera || !renderer) return;
+  const w = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+  const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', onWindowResize);
+}
+
+/**
+ * ============================================================================
+ * 6. GAME LOOP, COLLISIONS & SKIN MICRO-ANIMATIONS (RIPPLE / ORBITS)
+ * ============================================================================
+ */
+function startGame() {
+  audio.init();
+  audio.startMusic();
+
+  meteorPool.forEach(m => { m.userData.active = false; m.visible = false; });
+  crystalPool.forEach(c => { c.userData.active = false; c.visible = false; });
+  particlePool.forEach(p => { p.userData.active = false; p.visible = false; });
+  shockwavePool.forEach(r => { r.userData.active = false; r.visible = false; });
+  trailPool.forEach(t => { t.userData.active = false; t.visible = false; });
+  while (planetsGroup.children.length) {
+    planetsGroup.remove(planetsGroup.children[0]);
+  }
+  if (sunEventMesh) { scene.remove(sunEventMesh); sunEventMesh = null; }
+  bonusPortals.forEach(bp => scene.remove(bp));
+  bonusPortals = [];
+  portalSpawnCooldown = 10;
+
+  runDistance = 0;
+  zoneCycleDistance = 0;
+  runCrystals = 0;
+  runXp = 0;
+  activePlanetZone = null;
+  planetEventRemainingSec = 0;
+  nextPlanetTriggerKm = rollNextPlanetTriggerKm(0);
+  targetX = 0; targetY = 0;
+  currentX = 0; currentY = 0;
+  cameraShakeIntensity = 0;
+  playerGroup.position.set(0, 0, 0);
+  playerGroup.visible = true;
+  companionGroup.visible = true;
+
+  enterOpenDeepSpace(false);
+
+  gameState = 'playing';
+  document.getElementById('main-menu').classList.add('hidden');
+  document.getElementById('overlay-modal').classList.add('hidden');
+  document.getElementById('game-hud').classList.remove('hidden');
+
+  updateHud();
+}
+
+function pauseGame() {
+  if (gameState !== 'playing') return;
+  gameState = 'paused';
+  showRunModal('ПАУЗА', 'Полёт приостановлен', 'Продолжить', () => {
+    gameState = 'playing';
+    document.getElementById('overlay-modal').classList.add('hidden');
+  });
+}
+
+function triggerGameOver() {
+  gameState = 'gameover';
+  audio.playSfx('crash');
+  cameraShakeIntensity = 0.55;
+  spawnExplosionParticles(playerGroup.position, 0x38bdf8, 38, true);
+  playerGroup.visible = false;
+
+  if (runDistance > player.bestDistance) {
+    player.bestDistance = runDistance;
+  }
+  player.totalDistance += runDistance;
+  savePlayerData();
+
+  setTimeout(() => {
+    showRunModal('КРУШЕНИЕ В КОСМОСЕ', 'Ваш уровень и кристаллы сохранены!', 'Лететь снова 🚀', () => {
+      startGame();
+    });
+  }, 550);
+}
+
+function showRunModal(badge, title, primaryText, primaryAction) {
+  document.getElementById('modal-badge').textContent = badge;
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('stat-run-dist').textContent = `${runDistance.toFixed(2)} км`;
+  document.getElementById('stat-run-crystals').textContent = `+${runCrystals} 💎`;
+  document.getElementById('stat-run-xp').textContent = `+${Math.floor(runXp)} XP`;
+
+  const btnPrim = document.getElementById('btn-modal-primary');
+  btnPrim.textContent = primaryText;
+  btnPrim.onclick = primaryAction;
+
+  document.getElementById('overlay-modal').classList.remove('hidden');
+}
+
+function returnToMainMenu() {
+  gameState = 'menu';
+  playerGroup.visible = true;
+  playerGroup.position.set(0, 0, 0);
+  camera.position.set(0, 2.2, 8.5);
+  document.getElementById('overlay-modal').classList.add('hidden');
+  document.getElementById('game-hud').classList.add('hidden');
+  document.getElementById('main-menu').classList.remove('hidden');
+  document.getElementById('companion-speech').style.opacity = '0';
+  updateAllUI();
+}
+
+function updateUniqueSkinAnimation(time, dt) {
+  if (!activeSkinAnimator || !playerAvatarRoot) return;
+
+  // Smooth rainbow spectrum cycling for Rainbow Skins (zero GC allocations)
+  if (activeSkinAnimator.isRainbow) {
+    const hue = (time * 0.00022) % 1;
+    _tmpColorA.setHSL(hue, 0.92, 0.58);
+    _tmpColorB.setHSL((hue + 0.15) % 1, 0.95, 0.65);
+    if (activeSkinAnimator.matteMat) {
+      if (activeSkinAnimator.type === 'cube') {
+        activeSkinAnimator.matteMat.color.copy(_tmpColorA);
+      } else {
+        activeSkinAnimator.matteMat.color.copy(_tmpColorA).lerp(_whiteColor, 0.25);
+      }
+    }
+    if (activeSkinAnimator.auraSprite) activeSkinAnimator.auraSprite.material.color.copy(_tmpColorB);
+    if (activeSkinAnimator.coreGlowSprite) activeSkinAnimator.coreGlowSprite.material.color.copy(_tmpColorA);
+    if (playerLight) playerLight.color.copy(_tmpColorA);
+  }
+
+  // Rainbow companion color cycling (zero GC allocations)
+  if (companionMesh && companionMesh.userData.isRainbow) {
+    const petHue = ((time * 0.00028) + 0.33) % 1;
+    _tmpColorA.setHSL(petHue, 0.95, 0.6);
+    companionMesh.material.color.copy(_tmpColorA);
+    companionMesh.material.emissive.copy(_tmpColorA);
+    if (companionLight) companionLight.color.copy(_tmpColorA);
+  }
+
+  // Orbiting electrons for Atom / Isotope skins
+  if (activeSkinAnimator.rings && activeSkinAnimator.rings.length > 0) {
+    activeSkinAnimator.rings.forEach((ring, idx) => {
+      ring.rotation.z += dt * (2.4 + idx * 0.55);
+      ring.rotation.x += dt * 0.45;
+    });
+  }
+
+  // Subtle radioactive / energy ripple shimmer (like Nuclear Isotope)
+  if (activeSkinAnimator.ripple && activeSkinAnimator.coreMesh) {
+    const pulse = 1 + Math.sin(time * 0.018) * 0.035 + Math.cos(time * 0.031) * 0.02;
+    activeSkinAnimator.coreMesh.scale.set(
+      pulse,
+      1 + Math.cos(time * 0.021) * 0.035,
+      pulse
+    );
+    if (activeSkinAnimator.coreMesh.material && activeSkinAnimator.coreMesh.material.map) {
+      activeSkinAnimator.coreMesh.material.map.offset.y = (time * 0.00035) % 1;
+    }
+  }
+}
+
+function animate(time) {
+  requestAnimationFrame(animate);
+  const rawDt = (time - lastFrameTime) / 1000 || 0.016;
+  const dt = Math.min(0.05, rawDt);
+  lastFrameTime = time;
+
+  // Silent Auto-Resolution Governor: keeps all visuals, effects & speed 100% intact while smoothly
+  // adjusting internal render pixelRatio if a mobile GPU (e.g., Galaxy A15) dips below 48 FPS
+  if (rawDt > 0.004 && rawDt < 0.25 && renderer) {
+    const instFps = 1 / rawDt;
+    fpsEma = fpsEma * 0.94 + instFps * 0.06;
+    if (currentDynamicDpr === null) currentDynamicDpr = renderer.getPixelRatio();
+    if (fpsEma < 46 && currentDynamicDpr > 0.85) {
+      currentDynamicDpr = Math.max(0.85, currentDynamicDpr - 0.05);
+      renderer.setPixelRatio(currentDynamicDpr);
+    } else if (fpsEma > 57 && currentDynamicDpr < Math.min(window.devicePixelRatio || 1, 1.75)) {
+      currentDynamicDpr = Math.min(Math.min(window.devicePixelRatio || 1, 1.75), currentDynamicDpr + 0.02);
+      renderer.setPixelRatio(currentDynamicDpr);
+    }
+  }
+
+  if (cameraShakeIntensity > 0) {
+    camera.position.x = (Math.random() - 0.5) * cameraShakeIntensity;
+    camera.position.y = 2.2 + (Math.random() - 0.5) * cameraShakeIntensity;
+    cameraShakeIntensity = Math.max(0, cameraShakeIntensity - dt * 1.8);
+  } else {
+    camera.position.x += (currentX * 0.16 - camera.position.x) * Math.min(1, dt * 6);
+    camera.position.y += (2.2 + currentY * 0.12 - camera.position.y) * Math.min(1, dt * 6);
+  }
+
+  updateUniqueSkinAnimation(time, dt);
+
+  if (gameState === 'menu') {
+    playerGroup.rotation.x += dt * 0.35;
+    playerGroup.rotation.y += dt * 0.55;
+    playerGroup.position.y = Math.sin(time * 0.002) * 0.28;
+    companionGroup.position.set(
+      playerGroup.position.x + 1.55,
+      playerGroup.position.y + 0.85 + Math.cos(time * 0.003) * 0.18,
+      0
+    );
+    companionMesh.rotation.y += dt * 1.5;
+    scrollStarsAndDust(dt * 8);
+    renderer.render(scene, camera);
+    return;
+  }
+
+  if (gameState !== 'playing') {
+    updateParticlesAndShockwaves(dt);
+    renderer.render(scene, camera);
+    return;
+  }
+
+  const speed = baseSpeed + Math.min(16, runDistance * 0.32);
+  const distDelta = (speed * dt) * 0.025;
+  runDistance += distDelta;
+  zoneCycleDistance += distDelta;
+
+  const xpGained = distDelta * 12;
+  runXp += xpGained;
+  addXp(xpGained);
+  advanceQuestProgress('distance', distDelta);
+
+  // Smoothly blend space background & fog colors
+  scene.background.lerp(targetBgColor, Math.min(1, dt * 1.2));
+  scene.fog.color.lerp(targetFogColor, Math.min(1, dt * 1.2));
+
+  if (activePlanetZone) {
+    planetEventRemainingSec -= dt;
+    document.getElementById('hud-zone').textContent = `${activePlanetZone.isSunEvent ? '☀️' : '🪐'} ${activePlanetZone.name}`;
+    if (planetEventRemainingSec <= 0) {
+      // Reset internal zone cycle counter to 0 while keeping `runDistance` (HUD, stats, records) untouched
+      zoneCycleDistance = 0;
+      nextPlanetTriggerKm = rollNextPlanetTriggerKm(0);
+      enterOpenDeepSpace(true);
+    }
+  } else if (zoneCycleDistance >= nextPlanetTriggerKm) {
+    triggerPlanetaryEvent();
+  }
+
+  const moveStep = 9.5 * dt;
+  if (keysPressed['ArrowLeft'] || keysPressed['KeyA']) targetX = Math.max(-6.5, targetX - moveStep);
+  if (keysPressed['ArrowRight'] || keysPressed['KeyD']) targetX = Math.min(6.5, targetX + moveStep);
+  if (keysPressed['ArrowUp'] || keysPressed['KeyW']) targetY = Math.min(4.2, targetY + moveStep);
+  if (keysPressed['ArrowDown'] || keysPressed['KeyS']) targetY = Math.max(-3.6, targetY - moveStep);
+
+  currentX += (targetX - currentX) * Math.min(1, dt * 10);
+  currentY += (targetY - currentY) * Math.min(1, dt * 10);
+  playerGroup.position.set(currentX, currentY, 0);
+
+  playerGroup.rotation.z = (currentX - targetX) * 0.18;
+  playerGroup.rotation.x = (targetY - currentY) * 0.15;
+  if (playerAvatarRoot) {
+    if (activeSkinAnimator && activeSkinAnimator.type === 'cube') {
+      // Keep cube oriented corner-forward with subtle roll around flight axis
+      playerAvatarRoot.rotation.y = 0;
+      playerAvatarRoot.rotation.z += dt * 0.9;
+    } else {
+      playerAvatarRoot.rotation.y += dt * 0.85;
+    }
+  }
+
+  trailSpawnTimer -= dt;
+  if (trailSpawnTimer <= 0 && player.settings.quality !== 'low') {
+    trailSpawnTimer = 0.032;
+    const t = trailPool.find(item => !item.userData.active);
+    if (t) {
+      t.position.copy(playerGroup.position);
+      t.position.z += 0.55;
+      t.material.color.copy(playerLight.color);
+      t.material.opacity = 0.32;
+      t.scale.setScalar(0.8);
+      t.userData.life = 0.35;
+      t.userData.active = true;
+      t.visible = true;
+    }
+  }
+  for (let i = 0; i < trailPool.length; i++) {
+    const t = trailPool[i];
+    if (t.userData.active) {
+      t.position.z += speed * dt * 0.85;
+      t.userData.life -= dt;
+      const ratio = Math.max(0, t.userData.life / 0.35);
+      t.material.opacity = ratio * 0.3;
+      t.scale.setScalar(ratio * 0.8);
+      if (t.userData.life <= 0) {
+        t.userData.active = false;
+        t.visible = false;
+      }
+    }
+  }
+
+  companionMesh.rotation.y += dt * 1.8;
+  if (companionMagnetTarget && companionMagnetTarget.userData.active) {
+    companionGroup.position.lerp(companionMagnetTarget.position, dt * 7);
+    if (companionGroup.position.distanceTo(companionMagnetTarget.position) < 0.72) {
+      collectCrystal(companionMagnetTarget, true);
+      companionMagnetTarget = null;
+    }
+  } else {
+    companionMagnetTarget = null;
+    _tmpVecA.set(
+      currentX + 1.45 + Math.sin(time * 0.0025) * 0.25,
+      currentY + 0.85 + Math.cos(time * 0.003) * 0.22,
+      -0.3
+    );
+    companionGroup.position.lerp(_tmpVecA, dt * 5);
+  }
+
+  companionQuoteTimer -= dt;
+  if (companionQuoteTimer <= 0) {
+    companionQuoteTimer = 120;
+    const q = WISE_QUOTES[Math.floor(Math.random() * WISE_QUOTES.length)];
+    triggerCompanionSpeech(q, 7000);
+  }
+  updateCompanionSpeechPosition();
+
+  scrollStarsAndDust(dt * speed * 1.2);
+
+  for (let i = planetsGroup.children.length - 1; i >= 0; i--) {
+    const p = planetsGroup.children[i];
+    p.rotation.y += p.userData.rotY * dt;
+    if (p.userData.retiring) {
+      // Smoothly drift away into the distance once the 10 km zone ends
+      p.position.z -= 22 * dt;
+      p.position.x += p.userData.side * 12 * dt;
+      if (p.position.z < -280) {
+        planetsGroup.remove(p);
+      }
+    } else {
+      // Slowly glide across the far horizon during the 10 km flyby
+      p.position.x -= p.userData.side * 0.65 * dt;
+    }
+  }
+
+  sunSpawnCooldown -= dt;
+  if (sunSpawnCooldown <= 0) {
+    sunSpawnCooldown = 8;
+    if (Math.random() < 0.005) spawnRareSunEvent();
+  }
+  if (sunEventMesh) {
+    sunEventMesh.position.z += speed * 0.85 * dt;
+    sunEventMesh.children[0].rotation.z += dt * 0.9;
+    const dx = Math.abs(sunEventMesh.position.x - playerGroup.position.x);
+    const dy = Math.abs(sunEventMesh.position.y - playerGroup.position.y);
+    const dz = Math.abs(sunEventMesh.position.z - playerGroup.position.z);
+    if (dz < 1.8 && Math.hypot(dx, dy) < 3.6) {
+      audio.playSfx('sun');
+      cameraShakeIntensity = 0.4;
+      spawnExplosionParticles(playerGroup.position, 0xfef08a, 45, true);
+      const bonus = 100;
+      player.crystals += bonus;
+      runCrystals += bonus;
+      addXp(500);
+      showToast('✨ НЕВЕРОЯТНО! Вы пролетели сквозь Светлый Портал! +100 💎 и +500 XP!', 'info');
+      scene.remove(sunEventMesh);
+      sunEventMesh = null;
+    } else if (sunEventMesh && sunEventMesh.position.z > 20) {
+      scene.remove(sunEventMesh);
+      sunEventMesh = null;
+    }
+  }
+
+  // Colored Bonus Portals (Rare Blue / Epic Purple / Legendary Yellow)
+  portalSpawnCooldown -= dt;
+  if (portalSpawnCooldown <= 0) {
+    portalSpawnCooldown = 7;
+    if (Math.random() < 0.14) spawnColoredBonusPortal();
+  }
+  for (let i = bonusPortals.length - 1; i >= 0; i--) {
+    const bp = bonusPortals[i];
+    bp.position.z += speed * 0.92 * dt;
+    bp.children[0].rotation.z += dt * 1.4;
+    const dx = bp.position.x - playerGroup.position.x;
+    const dy = bp.position.y - playerGroup.position.y;
+    const dz = Math.abs(bp.position.z - playerGroup.position.z);
+    if (dz < 1.65 && Math.hypot(dx, dy) <= bp.userData.radius + 0.35) {
+      const cfg = bp.userData;
+      const reward = Math.floor(cfg.minCrystals + Math.random() * (cfg.maxCrystals - cfg.minCrystals + 1));
+      audio.playSfx('chest');
+      spawnExplosionParticles(playerGroup.position, cfg.color, 28, true);
+      player.crystals += reward;
+      player.totalCrystalsCollected += reward;
+      runCrystals += reward;
+      addXp(reward * 8);
+      showToast(`🌀 ${cfg.label}: +${reward} 💎!`, 'info');
+      scene.remove(bp);
+      bonusPortals.splice(i, 1);
+    } else if (bp.position.z > 18) {
+      scene.remove(bp);
+      bonusPortals.splice(i, 1);
+    }
+  }
+
+  obstacleSpawnTimer -= dt;
+  if (obstacleSpawnTimer <= 0) {
+    obstacleSpawnTimer = Math.max(0.32, 0.78 - runDistance * 0.008);
+    spawnPooledMeteor();
+  }
+
+  for (let i = 0; i < meteorPool.length; i++) {
+    const m = meteorPool[i];
+    if (!m.userData.active) continue;
+    m.position.z += speed * dt;
+    m.rotation.x += m.userData.rotSpeed.x * dt;
+    m.rotation.y += m.userData.rotSpeed.y * dt;
+
+    if (m.position.distanceTo(playerGroup.position) < m.userData.radius + 0.52) {
+      triggerGameOver();
+      return;
+    }
+    if (m.position.z > 14) {
+      m.userData.active = false;
+      m.visible = false;
+    }
+  }
+
+  crystalSpawnTimer -= dt;
+  if (crystalSpawnTimer <= 0) {
+    const mult = activePlanetZone ? activePlanetZone.crystalBonusMult : 1.0;
+    crystalSpawnTimer = (0.85 + Math.random() * 0.6) / mult;
+    spawnPooledCrystal();
+  }
+
+  for (let i = 0; i < crystalPool.length; i++) {
+    const c = crystalPool[i];
+    if (!c.userData.active) continue;
+    c.position.z += speed * dt;
+    c.rotation.y += dt * 2.6;
+
+    if (!companionMagnetTarget && c.position.z > -18 && c.position.z < -4 && Math.random() < 0.0025) {
+      companionMagnetTarget = c;
+    }
+
+    if (c.position.distanceTo(playerGroup.position) < 1.38) {
+      collectCrystal(c, false);
+      continue;
+    }
+    if (c.position.z > 14) {
+      c.userData.active = false;
+      c.visible = false;
+    }
+  }
+
+  updateParticlesAndShockwaves(dt);
+  updateHud();
+  renderer.render(scene, camera);
+}
+
+function updateParticlesAndShockwaves(dt) {
+  for (let i = 0; i < particlePool.length; i++) {
+    const pt = particlePool[i];
+    if (!pt.userData.active) continue;
+    pt.position.addScaledVector(pt.userData.vel, dt);
+    pt.userData.life -= dt;
+    const ratio = Math.max(0.01, pt.userData.life / pt.userData.maxLife);
+    pt.scale.setScalar(ratio);
+    pt.material.opacity = ratio;
+    if (pt.userData.life <= 0) {
+      pt.userData.active = false;
+      pt.visible = false;
+    }
+  }
+
+  for (let i = 0; i < shockwavePool.length; i++) {
+    const ring = shockwavePool[i];
+    if (!ring.userData.active) continue;
+    ring.userData.life -= dt;
+    const progress = 1 - Math.max(0, ring.userData.life / 0.45);
+    ring.scale.setScalar(0.5 + progress * 4.5);
+    ring.material.opacity = (1 - progress) * 0.85;
+    if (ring.userData.life <= 0) {
+      ring.userData.active = false;
+      ring.visible = false;
+    }
+  }
+}
+
+function collectCrystal(crystalMesh, byCompanion) {
+  audio.playSfx('crystal');
+  spawnExplosionParticles(crystalMesh.position, 0x67e8f9, 14, true);
+  crystalMesh.userData.active = false;
+  crystalMesh.visible = false;
+
+  const gain = (activePlanetZone && activePlanetZone.isSunEvent) ? (Math.random() < 0.85 ? 2 : 1) : 1;
+  player.crystals += gain;
+  player.totalCrystalsCollected += gain;
+  runCrystals += gain;
+  runXp += 15 * gain;
+  addXp(15 * gain);
+  advanceQuestProgress('crystals', gain);
+
+  if (byCompanion) {
+    triggerCompanionSpeech('✨ Поймал кристалл для тебя!', 2400);
+  }
+}
+
+function scrollStarsAndDust(dz) {
+  if (starField) {
+    const pos = starField.geometry.attributes.position.array;
+    for (let i = 2; i < pos.length; i += 3) {
+      pos[i] += dz;
+      if (pos[i] > 20) pos[i] = -250;
+    }
+    starField.geometry.attributes.position.needsUpdate = true;
+  }
+
+  if (dustField) {
+    const dPos = dustField.geometry.attributes.position.array;
+    for (let i = 2; i < dPos.length; i += 3) {
+      dPos[i] += dz * 1.45;
+      if (dPos[i] > 12) dPos[i] = -110;
+    }
+    dustField.geometry.attributes.position.needsUpdate = true;
+  }
+
+  if (speedLinesGroup) {
+    for (let i = 0; i < speedLinesGroup.children.length; i++) {
+      const line = speedLinesGroup.children[i];
+      line.position.z += dz * 1.85;
+      if (line.position.z > 12) line.position.z = -110;
+    }
+  }
+}
+
+function updateHud() {
+  if (player.crystals !== lastHudCrystals) {
+    lastHudCrystals = player.crystals;
+    document.getElementById('hud-crystals').textContent = player.crystals;
+  }
+  const distStr = `${runDistance.toFixed(2)} км`;
+  if (distStr !== lastHudDistStr) {
+    lastHudDistStr = distStr;
+    document.getElementById('hud-distance').textContent = distStr;
+  }
+  if (player.level !== lastHudLevel) {
+    lastHudLevel = player.level;
+    document.getElementById('hud-level').textContent = player.level;
+  }
+
+  const req = getRequiredXp(player.level);
+  const xpStr = `${Math.floor(player.xp)} / ${req}`;
+  if (xpStr !== lastHudXpStr) {
+    lastHudXpStr = xpStr;
+    document.getElementById('hud-xp-text').textContent = xpStr;
+    document.getElementById('hud-xp-bar').style.width = `${Math.min(100, (player.xp / req) * 100)}%`;
+  }
+
+  const activeQ = player.quests.find(q => !q.claimed) || player.quests[0];
+  if (activeQ) {
+    const qStr = `${activeQ.title} (${Math.min(activeQ.target, Math.floor(activeQ.progress))}/${activeQ.target})`;
+    if (qStr !== lastHudQuestStr) {
+      lastHudQuestStr = qStr;
+      document.getElementById('hud-quest-desc').textContent = qStr;
+      document.getElementById('hud-quest-bar').style.width = `${Math.min(100, (activeQ.progress / activeQ.target) * 100)}%`;
+    }
+  }
+}
+
+/**
+ * ============================================================================
+ * 7. SHOP, CHESTS, INVENTORY, QUESTS & PROFILE UI
+ * ============================================================================
+ */
+let currentShopCat = 'skins';
+
+// Helper to render a distinct matte preview icon matching the skin's shape
+function renderSkinPreviewHtml(skin, sizeClass = 'w-12 h-12') {
+  const shapeBadges = {
+    cube: '🧊',
+    atom: '⚛️',
+    nugget: '💠',
+    crystal: '💎',
+    reactor: '⚙️',
+    stellated: '✴️',
+    prism: '🔺',
+    polyhedron: '⬡',
+    sphere: '🔮',
+    geodesic_sphere: '🌐',
+    ringed_orb: '🪐',
+    torus: '🍩',
+    twin_sphere: '♊'
+  };
+  const roundShapes = ['atom', 'sphere', 'geodesic_sphere', 'ringed_orb', 'torus', 'twin_sphere'];
+  const borderRadius = roundShapes.includes(skin.shapeType)
+    ? 'rounded-full'
+    : (skin.shapeType === 'cube' ? 'rounded-md rotate-45 scale-90' : 'rounded-xl');
+
+  const patternOverlay = skin.isRainbow
+    ? 'linear-gradient(135deg, #ef4444, #f59e0b, #22c55e, #06b6d4, #6366f1, #ec4899)'
+    : (skin.pattern === 'radioactive_ripple'
+      ? 'repeating-radial-gradient(circle, rgba(255,255,255,0.22) 0px, rgba(255,255,255,0.22) 2px, transparent 3px, transparent 7px)'
+      : (skin.pattern === 'crystal_facets'
+        ? 'linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(0,0,0,0.25) 50%, rgba(255,255,255,0.12) 100%)'
+        : 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.14), rgba(0,0,0,0.28))'));
+
+  const innerRot = skin.shapeType === 'cube' ? '-rotate-45' : '';
+  return `
+    <div class="${sizeClass} mx-auto ${borderRadius} my-2 flex items-center justify-center border border-white/25 relative overflow-hidden"
+         style="background-color:${skin.color}; background-image:${patternOverlay};">
+      <span class="text-base drop-shadow ${innerRot}">${shapeBadges[skin.shapeType] || '⬡'}</span>
+    </div>
+  `;
+}
+
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+  const target = document.getElementById(`tab-${tabId}`);
+  if (target) target.classList.remove('hidden');
+
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    const active = btn.dataset.tab === tabId;
+    btn.className = active
+      ? 'nav-btn flex-1 min-w-[64px] py-2 px-2 rounded-xl flex flex-col items-center gap-0.5 text-cyan-300 bg-cyan-500/15 font-bold text-[11px] transition cursor-pointer'
+      : 'nav-btn flex-1 min-w-[64px] py-2 px-2 rounded-xl flex flex-col items-center gap-0.5 text-slate-400 hover:text-white font-semibold text-[11px] transition cursor-pointer';
+  });
+
+  if (tabId === 'shop') renderShop();
+  if (tabId === 'chests') renderChests();
+  if (tabId === 'inventory') renderInventory();
+  if (tabId === 'quests') renderQuests();
+  if (tabId === 'profile') renderProfile();
+  if (tabId === 'leaderboard') renderLeaderboard();
+}
+
+function setShopCategory(cat) {
+  currentShopCat = cat;
+  document.querySelectorAll('.shop-cat-btn').forEach(b => {
+    b.className = b.dataset.cat === cat
+      ? 'shop-cat-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-500 text-slate-950 cursor-pointer'
+      : 'shop-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 cursor-pointer';
+  });
+  document.getElementById('custom-music-box').classList.toggle('hidden', cat !== 'music');
+  renderShop();
+}
+
+function renderShop() {
+  const grid = document.getElementById('shop-grid');
+  grid.innerHTML = '';
+
+  let items = [];
+  if (currentShopCat === 'skins') items = ALL_SKINS.filter(s => s.inShop);
+  else if (currentShopCat === 'pets') items = ALL_PETS.filter(p => p.inShop);
+  else if (currentShopCat === 'music') items = ALL_MUSIC.filter(m => m.inShop);
+  else if (currentShopCat === 'cosmetics') items = ALL_COSMETICS.filter(c => c.inShop);
+
+  items.forEach(item => {
+    const ownedCount = player.inventory[item.id] || 0;
+    const rar = RARITIES[item.rarity];
+    const card = document.createElement('div');
+    card.className = 'ice-card rounded-2xl p-3 flex flex-col justify-between';
+
+    const previewHtml = item.category === 'skin'
+      ? renderSkinPreviewHtml(item, 'w-12 h-12')
+      : `<div class="text-3xl text-center my-2">${item.icon || '✨'}</div>`;
+
+    card.innerHTML = `
+      <div>
+        <div class="flex justify-between items-center">
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ${rar.badgeClass}">${rar.name}</span>
+          ${ownedCount > 0 ? `<span class="text-[10px] text-emerald-400 font-bold">Есть (${ownedCount})</span>` : ''}
+        </div>
+        ${previewHtml}
+        <div class="text-xs font-bold text-white text-center truncate mt-1">${item.name}</div>
+        <div class="text-[10px] font-medium text-center mt-0.5 ${
+          item.category === 'frame' ? 'text-cyan-300' :
+          item.category === 'banner' ? 'text-indigo-300' :
+          item.category === 'effect' ? 'text-amber-300' : 'text-slate-400'
+        }">${getCategoryLabel(item.category)}</div>
+      </div>
+      <div class="mt-3 flex flex-col gap-1.5">
+        ${item.category === 'music' ? `<button onclick="previewMusic('${item.id}')" class="w-full py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-cyan-300 font-semibold cursor-pointer">▶ Прослушать</button>` : ''}
+        <button onclick="buyShopItem('${item.id}')" class="w-full py-1.5 rounded-xl font-bold text-xs ${ownedCount > 0 ? 'bg-slate-800 text-slate-300' : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'} transition cursor-pointer">
+          ${ownedCount > 0 ? 'Куплено' : (item.price === 0 ? 'Бесплатно' : `${item.price} 💎`)}
+        </button>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  document.getElementById('custom-music-unlock-area').classList.toggle('hidden', player.customMusicUnlocked);
+  document.getElementById('custom-music-controls').classList.toggle('hidden', !player.customMusicUnlocked);
+}
+
+function previewMusic(musicId) {
+  const track = ALL_MUSIC.find(m => m.id === musicId);
+  if (!track) return;
+  audio.startMusic(track);
+  showToast(`🎵 Предпрослушивание: ${track.name}`, 'info');
+}
+
+function buyShopItem(itemId) {
+  const item = findItemById(itemId);
+  if (!item) return;
+  if ((player.inventory[itemId] || 0) > 0) {
+    equipItem(itemId);
+    return;
+  }
+  if (player.crystals < item.price) {
+    showToast('Недостаточно кристаллов 💎!', 'error');
+    return;
+  }
+  player.crystals -= item.price;
+  player.inventory[itemId] = 1;
+  savePlayerData();
+  equipItem(itemId);
+  audio.playSfx('chest');
+  showToast(`✅ Приобретено: ${item.name}`, 'info');
+  renderShop();
+  updateAllUI();
+}
+
+function unlockCustomMusic() {
+  if (player.crystals < 500) {
+    showToast('Нужно 500 💎 для разблокировки загрузки своих треков!', 'error');
+    return;
+  }
+  player.crystals -= 500;
+  player.customMusicUnlocked = true;
+  savePlayerData();
+  updateAllUI();
+  renderShop();
+  showToast('🎧 Загрузка собственных треков разблокирована!', 'info');
+}
+
+function applyCustomAudioUrl() {
+  const url = document.getElementById('custom-audio-url').value.trim();
+  if (!url) return;
+  player.customMusicUrl = url;
+  player.equippedMusic = 'music_custom';
+  savePlayerData();
+  audio.startMusic();
+  showToast('🎶 Пользовательский аудиопоток запущен!', 'info');
+}
+
+function renderChests() {
+  const grid = document.getElementById('chests-grid');
+  grid.innerHTML = '';
+
+  CHESTS.forEach(chest => {
+    const card = document.createElement('div');
+    card.className = `rounded-2xl p-4 bg-gradient-to-br ${chest.accent} border flex flex-col justify-between`;
+    card.innerHTML = `
+      <div>
+        <div class="flex items-center justify-between">
+          <span class="text-4xl animate-float">${chest.icon}</span>
+          <span class="text-xs font-extrabold px-2.5 py-1 rounded-xl bg-slate-950/70 text-cyan-300 border border-cyan-500/30">${chest.price} 💎</span>
+        </div>
+        <h3 class="text-base font-extrabold text-white mt-3">${chest.name}</h3>
+        <p class="text-xs text-slate-300 mt-1">${chest.desc}</p>
+        <div class="mt-3 pt-2.5 border-t border-white/10 text-[10px] text-slate-300 flex flex-wrap gap-1.5">
+          <span>Обыч: ${chest.weights.common}%</span> •
+          <span class="text-sky-300">Редк: ${chest.weights.rare}%</span> •
+          <span class="text-purple-300">Эпик: ${chest.weights.epic}%</span> •
+          <span class="text-amber-300">Лег: ${chest.weights.legendary}%</span> •
+          <span class="text-rose-400 font-bold">Миф: ${chest.weights.mythic}%</span>
+        </div>
+      </div>
+      <button onclick="openChest('${chest.id}')" class="mt-4 w-full py-2.5 rounded-xl font-extrabold text-xs bg-white/95 hover:bg-cyan-300 text-slate-950 transition shadow-lg cursor-pointer">
+        Открыть за ${chest.price} 💎
+      </button>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function openChest(chestId) {
+  const chest = CHESTS.find(c => c.id === chestId);
+  if (!chest) return;
+  if (player.crystals < chest.price) {
+    showToast('Недостаточно кристаллов 💎 для открытия сундука!', 'error');
+    return;
+  }
+
+  player.crystals -= chest.price;
+  player.chestsOpened += 1;
+  advanceQuestProgress('chests', 1);
+
+  const roll = Math.random() * 100;
+  let acc = 0;
+  let chosenRarity = 'common';
+  for (const [rKey, weight] of Object.entries(chest.weights)) {
+    acc += weight;
+    if (roll <= acc) { chosenRarity = rKey; break; }
+  }
+
+  let pool = [
+    ...ALL_SKINS.filter(s => s.rarity === chosenRarity),
+    ...ALL_PETS.filter(p => p.rarity === chosenRarity),
+    ...ALL_COSMETICS.filter(c => c.rarity === chosenRarity),
+    ...ALL_MUSIC.filter(m => m.rarity === chosenRarity)
+  ];
+
+  if (chest.rainbowOnly) {
+    const rbPool = [
+      ...ALL_SKINS.filter(s => s.isRainbow && s.rarity === chosenRarity),
+      ...ALL_PETS.filter(p => p.isRainbow),
+      ...ALL_COSMETICS.filter(c => c.isRainbow)
+    ];
+    if (rbPool.length > 0) pool = rbPool;
+  } else if (chest.petBoost && Math.random() < 0.55) {
+    const petPool = ALL_PETS.filter(p => p.rarity === chosenRarity);
+    if (petPool.length > 0) pool = petPool;
+  }
+
+  const wonItem = pool[Math.floor(Math.random() * pool.length)] || ALL_SKINS[10];
+  const wasOwned = (player.inventory[wonItem.id] || 0) > 0;
+  player.inventory[wonItem.id] = (player.inventory[wonItem.id] || 0) + 1;
+
+  savePlayerData();
+  updateAllUI();
+
+  const modal = document.getElementById('chest-modal');
+  const animIcon = document.getElementById('chest-anim-icon');
+  const resArea = document.getElementById('chest-result-area');
+  const openText = document.getElementById('chest-opening-text');
+
+  animIcon.textContent = chest.icon;
+  animIcon.classList.remove('hidden');
+  resArea.classList.add('hidden');
+  openText.classList.remove('hidden');
+  modal.classList.remove('hidden');
+
+  setTimeout(() => {
+    audio.playSfx('chest');
+    animIcon.classList.add('hidden');
+    openText.classList.add('hidden');
+    resArea.classList.remove('hidden');
+
+    const rar = RARITIES[wonItem.rarity];
+    const rarBadge = document.getElementById('chest-item-rarity');
+    rarBadge.textContent = rar.name.toUpperCase();
+    rarBadge.className = `inline-block px-3 py-0.5 rounded-full text-xs font-bold border mb-2 ${rar.badgeClass}`;
+
+    const prev = document.getElementById('chest-item-preview');
+    if (wonItem.category === 'skin') {
+      prev.style.background = wonItem.color;
+      prev.textContent = wonItem.shapeType === 'atom' ? '⚛️' : (wonItem.shapeType === 'nugget' ? '🪨' : '💎');
+    } else {
+      prev.style.background = 'rgba(15,23,42,0.9)';
+      prev.textContent = wonItem.icon || '✨';
+    }
+
+    document.getElementById('chest-item-name').textContent = wonItem.name;
+    document.getElementById('chest-item-type').textContent = getCategoryLabel(wonItem.category);
+    document.getElementById('chest-dup-note').classList.toggle('hidden', !wasOwned);
+  }, 850);
+}
+
+let currentInvCat = 'all';
+let currentInvShape = 'all';
+
+function setInvCategory(cat) {
+  currentInvCat = cat;
+  if (cat !== 'skin') currentInvShape = 'all';
+  document.querySelectorAll('.inv-cat-btn').forEach(b => {
+    b.className = b.dataset.cat === cat
+      ? 'inv-cat-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-500 text-slate-950 cursor-pointer'
+      : 'inv-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 cursor-pointer';
+  });
+  renderInventory();
+}
+
+function setInvSkinShape(shapeId) {
+  currentInvShape = shapeId;
+  renderInventory();
+}
+
+function renderInventory() {
+  const grid = document.getElementById('inventory-grid');
+  const catFilter = currentInvCat;
+  const rarFilter = document.getElementById('inv-filter-rarity').value;
+  const shapesBar = document.getElementById('inv-skin-shapes-bar');
+
+  if (catFilter === 'skin') {
+    shapesBar.classList.remove('hidden');
+    shapesBar.classList.add('flex');
+    shapesBar.innerHTML = SKIN_SHAPES_META.map(sh => {
+      const active = currentInvShape === sh.id;
+      return `<button onclick="setInvSkinShape('${sh.id}')" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+        active ? 'bg-cyan-400 text-slate-950 font-bold' : 'bg-slate-900/90 text-slate-300 hover:bg-slate-800 border border-slate-700/70'
+      }">${sh.icon} ${sh.label}</button>`;
+    }).join('');
+  } else {
+    shapesBar.classList.add('hidden');
+    shapesBar.classList.remove('flex');
+  }
+
+  grid.innerHTML = '';
+
+  const ownedIds = Object.keys(player.inventory).filter(id => player.inventory[id] > 0);
+  const items = ownedIds.map(id => findItemById(id)).filter(Boolean).filter(item => {
+    if (catFilter !== 'all' && item.category !== catFilter) return false;
+    if (catFilter === 'skin' && currentInvShape !== 'all' && item.shapeType !== currentInvShape) return false;
+    if (rarFilter !== 'all' && item.rarity !== rarFilter) return false;
+    return true;
+  });
+
+  if (items.length === 0) {
+    grid.innerHTML = `<div class="col-span-full text-center py-10 text-sm text-slate-400">По выбранным фильтрам предметов пока нет. Откройте сундуки или загляните в магазин!</div>`;
+    return;
+  }
+
+  items.forEach(item => {
+    const count = player.inventory[item.id];
+    const rar = RARITIES[item.rarity];
+    const isEquipped = isItemEquipped(item);
+    const sellPrice = rar.sellBase;
+
+    const card = document.createElement('div');
+    card.className = `ice-card rounded-2xl p-3 flex flex-col justify-between ${isEquipped ? 'border-cyan-400 bg-cyan-950/30' : ''}`;
+
+    const preview = item.category === 'skin'
+      ? renderSkinPreviewHtml(item, 'w-11 h-11')
+      : `<div class="text-3xl text-center my-2">${item.icon || '✨'}</div>`;
+
+    card.innerHTML = `
+      <div>
+        <div class="flex justify-between items-center">
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ${rar.badgeClass}">${rar.name}</span>
+          <span class="text-[11px] font-bold text-slate-300">x${count}</span>
+        </div>
+        ${preview}
+        <div class="text-xs font-bold text-white text-center truncate">${item.name}</div>
+        <div class="text-[10px] font-semibold text-center mt-0.5 ${
+          item.category === 'frame' ? 'text-cyan-300' :
+          item.category === 'banner' ? 'text-indigo-300' :
+          item.category === 'effect' ? 'text-amber-300' : 'text-slate-400'
+        }">${getCategoryLabel(item.category)}</div>
+      </div>
+      <div class="mt-2.5 flex flex-col gap-1">
+        <button onclick="equipItem('${item.id}')" class="w-full py-1.5 rounded-xl font-bold text-xs ${isEquipped ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'} cursor-pointer">
+          ${isEquipped ? '✓ Выбрано' : 'Надеть'}
+        </button>
+        ${count > 1 ? `<button onclick="sellDuplicate('${item.id}')" class="w-full py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-[10px] font-semibold cursor-pointer">Продать 1 шт (+${sellPrice} 💎)</button>` : ''}
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function sellDuplicate(itemId) {
+  if ((player.inventory[itemId] || 0) <= 1) return;
+  const item = findItemById(itemId);
+  const gain = RARITIES[item.rarity].sellBase;
+  player.inventory[itemId] -= 1;
+  player.crystals += gain;
+  savePlayerData();
+  renderInventory();
+  updateAllUI();
+  showToast(`💎 Продано: ${item.name} (+${gain} кристаллов)`, 'info');
+}
+
+function equipItem(itemId) {
+  const item = findItemById(itemId);
+  if (!item) return;
+
+  if (item.category === 'skin') {
+    player.equippedSkin = item.id;
+    applyEquippedSkinVisuals();
+  } else if (item.category === 'pet') {
+    player.equippedPet = item.id;
+    applyEquippedCompanionVisuals();
+  } else if (item.category === 'frame') {
+    player.equippedFrame = item.id;
+  } else if (item.category === 'banner') {
+    player.equippedBanner = item.id;
+  } else if (item.category === 'effect') {
+    player.equippedEffect = item.id;
+  } else if (item.category === 'music') {
+    player.equippedMusic = item.id;
+    audio.startMusic();
+  }
+
+  savePlayerData();
+  renderInventory();
+  updateAllUI();
+}
+
+function isItemEquipped(item) {
+  return player.equippedSkin === item.id ||
+    player.equippedPet === item.id ||
+    player.equippedFrame === item.id ||
+    player.equippedBanner === item.id ||
+    player.equippedEffect === item.id ||
+    player.equippedMusic === item.id;
+}
+
+function findItemById(id) {
+  return ALL_SKINS.find(x => x.id === id) ||
+    ALL_PETS.find(x => x.id === id) ||
+    ALL_COSMETICS.find(x => x.id === id) ||
+    ALL_MUSIC.find(x => x.id === id);
+}
+
+function getCategoryLabel(cat) {
+  const map = { skin: 'Облик', pet: 'Компаньон', frame: 'Рамка аватара', banner: 'Баннер профиля', effect: 'Эффект профиля', music: 'Музыкальный трек' };
+  return map[cat] || cat;
+}
+
+function initOrRefreshQuests() {
+  const now = Date.now();
+  if (!player.quests || player.quests.length === 0 || now >= player.questResetTime) {
+    player.quests = [
+      { id: 'q1', type: 'crystals', title: 'Собрать 30 кристаллов', target: 30, progress: 0, rewardCrystals: 45, rewardXp: 250, claimed: false },
+      { id: 'q2', type: 'distance', title: 'Пролететь 3.0 км в космосе', target: 3, progress: 0, rewardCrystals: 60, rewardXp: 350, claimed: false },
+      { id: 'q3', type: 'chests', title: 'Открыть 1 квантовый сундук', target: 1, progress: 0, rewardCrystals: 50, rewardXp: 300, claimed: false },
+      { id: 'q4', type: 'crystals', title: 'Собрать 100 кристаллов', target: 100, progress: 0, rewardCrystals: 140, rewardXp: 700, claimed: false }
+    ];
+    player.questResetTime = now + 4 * 60 * 60 * 1000;
+    savePlayerData();
+  }
+}
+
+function advanceQuestProgress(type, amount) {
+  let updated = false;
+  player.quests.forEach(q => {
+    if (!q.claimed && q.type === type && q.progress < q.target) {
+      q.progress = Math.min(q.target, q.progress + amount);
+      updated = true;
+    }
+  });
+  if (updated) savePlayerData();
+}
+
+function renderQuests() {
+  const list = document.getElementById('quests-list');
+  list.innerHTML = '';
+
+  player.quests.forEach(q => {
+    const done = q.progress >= q.target;
+    const pct = Math.min(100, (q.progress / q.target) * 100);
+    const card = document.createElement('div');
+    card.className = 'ice-card rounded-2xl p-4 flex flex-col justify-between';
+    card.innerHTML = `
+      <div>
+        <div class="flex justify-between items-center">
+          <span class="text-sm font-bold text-white">${q.title}</span>
+          <span class="text-xs font-bold text-cyan-300">+${q.rewardCrystals} 💎 • +${q.rewardXp} XP</span>
+        </div>
+        <div class="w-full h-2 bg-slate-800 rounded-full mt-3 overflow-hidden">
+          <div class="h-full bg-gradient-to-r from-cyan-400 to-indigo-400" style="width:${pct}%"></div>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-1.5">Прогресс: ${q.type === 'distance' ? q.progress.toFixed(2) : Math.floor(q.progress)} / ${q.target}</div>
+      </div>
+      <button onclick="claimQuest('${q.id}')" ${(!done || q.claimed) ? 'disabled' : ''} class="mt-3 w-full py-2 rounded-xl font-bold text-xs transition ${q.claimed ? 'bg-slate-800 text-slate-500' : (done ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 cursor-pointer' : 'bg-slate-800/80 text-slate-400')}">
+        ${q.claimed ? '✓ Награда получена' : (done ? 'Забрать награду!' : 'В процессе...')}
+      </button>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function claimQuest(qId) {
+  const q = player.quests.find(x => x.id === qId);
+  if (!q || q.claimed || q.progress < q.target) return;
+  q.claimed = true;
+  player.crystals += q.rewardCrystals;
+  addXp(q.rewardXp);
+  audio.playSfx('chest');
+  savePlayerData();
+  renderQuests();
+  updateAllUI();
+  showToast(`🎯 Задание выполнено! +${q.rewardCrystals} 💎`, 'info');
+}
+
+setInterval(() => {
+  const diff = Math.max(0, player.questResetTime - Date.now());
+  if (diff === 0) initOrRefreshQuests();
+  const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
+  const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+  const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+  const el = document.getElementById('quest-timer');
+  if (el) el.textContent = `${h}:${m}:${s}`;
+}, 1000);
+
+function renderProfile() {
+  document.getElementById('profile-name-input').value = player.username;
+  document.getElementById('prof-lvl-val').textContent = player.level;
+  const req = getRequiredXp(player.level);
+  document.getElementById('prof-xp-val').textContent = `${Math.floor(player.xp)} / ${req}`;
+  document.getElementById('prof-xp-bar').style.width = `${Math.min(100, (player.xp / req) * 100)}%`;
+
+  document.getElementById('prof-best-dist').textContent = `${player.bestDistance.toFixed(2)} км`;
+  document.getElementById('prof-total-crystals').textContent = player.totalCrystalsCollected;
+  const ownedSkinsCount = ALL_SKINS.filter(s => (player.inventory[s.id] || 0) > 0).length;
+  document.getElementById('prof-skins-count').textContent = `${ownedSkinsCount} / ${ALL_SKINS.length}`;
+
+  const frameObj = ALL_COSMETICS.find(c => c.id === player.equippedFrame) || ALL_COSMETICS[0];
+  const bannerObj = ALL_COSMETICS.find(c => c.id === player.equippedBanner) || ALL_COSMETICS.find(c => c.category === 'banner');
+  const effectObj = ALL_COSMETICS.find(c => c.id === player.equippedEffect) || ALL_COSMETICS.find(c => c.category === 'effect');
+
+  const bannerCard = document.getElementById('profile-banner-card');
+  bannerCard.style.background = bannerObj.bgStyle;
+  bannerCard.className = `rounded-2xl p-5 sm:p-6 relative overflow-hidden border border-white/15 transition-all ${effectObj.cssClass || ''}`;
+
+  const avatarFrame = document.getElementById('profile-avatar-frame');
+  avatarFrame.className = `w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center ${frameObj.cssClass || 'frame-ice'}`;
+
+  document.getElementById('prof-eq-frame').textContent = frameObj.name;
+  document.getElementById('prof-eq-banner').textContent = bannerObj.name;
+  document.getElementById('prof-eq-effect').textContent = effectObj.name;
+
+  const presetGrid = document.getElementById('preset-avatars-grid');
+  presetGrid.innerHTML = '';
+  PRESET_AVATARS.forEach(em => {
+    const b = document.createElement('button');
+    b.className = 'w-10 h-10 rounded-xl bg-slate-800 hover:bg-cyan-500/30 border border-slate-700 text-xl flex items-center justify-center cursor-pointer transition';
+    b.textContent = em;
+    b.onclick = () => {
+      player.avatarEmoji = em;
+      player.avatarCustomDataUrl = '';
+      savePlayerData();
+      updateAllUI();
+      renderProfile();
+    };
+    presetGrid.appendChild(b);
+  });
+}
+
+function saveProfileName() {
+  const val = document.getElementById('profile-name-input').value.trim();
+  if (val) {
+    player.username = val;
+    savePlayerData();
+    updateAllUI();
+    showToast('✅ Никнейм обновлён!', 'info');
+  }
+}
+
+document.getElementById('upload-avatar-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    player.avatarCustomDataUrl = ev.target.result;
+    savePlayerData();
+    updateAllUI();
+    renderProfile();
+    showToast('📷 Кастомный значок профиля установлен!', 'info');
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('custom-audio-file').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  player.customMusicUrl = url;
+  player.equippedMusic = 'music_custom';
+  audio.startMusic();
+  showToast(`🎶 Запущен ваш трек: ${file.name}`, 'info');
+});
+
+function renderLeaderboard() {
+  const list = document.getElementById('leaderboard-list');
+  const bots = [
+    { name: 'Астронавт Кай', level: 48, dist: 64.20, icon: '🌌' },
+    { name: 'Ледяная Валькирия', level: 39, dist: 47.85, icon: '❄️' },
+    { name: 'Капитан Орион', level: 31, dist: 35.10, icon: '🚀' },
+    { name: 'Неон_Дрифтер', level: 24, dist: 24.60, icon: '💠' },
+    { name: 'Светлана_Космос', level: 18, dist: 16.40, icon: '🪐' },
+    { name: 'Квазар_99', level: 12, dist: 9.80, icon: '✨' },
+    { name: 'Новичок Туманности', level: 5, dist: 3.20, icon: '🧊' }
+  ];
+
+  const all = [
+    ...bots,
+    { name: `${player.username} (Вы)`, level: player.level, dist: player.bestDistance, icon: player.avatarEmoji, isPlayer: true }
+  ].sort((a, b) => b.dist - a.dist);
+
+  list.innerHTML = '';
+  all.forEach((entry, idx) => {
+    const row = document.createElement('div');
+    row.className = `flex items-center justify-between p-3 rounded-2xl border ${entry.isPlayer ? 'bg-cyan-500/15 border-cyan-400/50' : 'bg-slate-900/70 border-slate-800'}`;
+    row.innerHTML = `
+      <div class="flex items-center gap-3">
+        <span class="w-7 text-center font-extrabold text-sm ${idx < 3 ? 'text-amber-300' : 'text-slate-400'}">#${idx + 1}</span>
+        <span class="text-xl">${entry.icon}</span>
+        <div>
+          <div class="text-xs sm:text-sm font-bold text-white">${entry.name}</div>
+          <div class="text-[10px] text-slate-400">Уровень ${entry.level}</div>
+        </div>
+      </div>
+      <div class="text-sm font-extrabold text-cyan-300">${entry.dist.toFixed(2)} км</div>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function toggleSetting(key, val) {
+  player.settings[key] = val;
+  savePlayerData();
+  if (key === 'music') {
+    val ? audio.startMusic() : audio.stopMusic();
+  }
+}
+
+function changeVolume(val) {
+  document.getElementById('set-vol-label').textContent = `${val}%`;
+  player.settings.volume = val / 100;
+  audio.setVolume(player.settings.volume);
+  savePlayerData();
+}
+
+function changeQuality(val) {
+  player.settings.quality = val;
+  savePlayerData();
+  createStarfield();
+  showToast('⚙️ Качество графики обновлено', 'info');
+}
+
+function updateAllUI() {
+  document.getElementById('header-crystals').textContent = player.crystals;
+  document.getElementById('header-username').textContent = player.username;
+  document.getElementById('header-level').textContent = player.level;
+
+  const req = getRequiredXp(player.level);
+  document.getElementById('header-xp-bar').style.width = `${Math.min(100, (player.xp / req) * 100)}%`;
+
+  const frameObj = ALL_COSMETICS.find(c => c.id === player.equippedFrame) || ALL_COSMETICS[0];
+  document.getElementById('header-avatar-wrap').className = `w-10 h-10 sm:w-11 sm:h-11 rounded-xl overflow-hidden flex items-center justify-center bg-slate-900 shrink-0 ${frameObj.cssClass || 'frame-ice'}`;
+
+  const hImg = document.getElementById('header-avatar-img');
+  const hEmo = document.getElementById('header-avatar-emoji');
+  const pImg = document.getElementById('profile-avatar-img');
+  const pEmo = document.getElementById('profile-avatar-emoji');
+
+  if (player.avatarCustomDataUrl) {
+    hImg.src = player.avatarCustomDataUrl;
+    hImg.classList.remove('hidden');
+    hEmo.classList.add('hidden');
+    pImg.src = player.avatarCustomDataUrl;
+    pImg.classList.remove('hidden');
+    pEmo.classList.add('hidden');
+  } else {
+    hImg.classList.add('hidden');
+    hEmo.classList.remove('hidden');
+    hEmo.textContent = player.avatarEmoji;
+    pImg.classList.add('hidden');
+    pEmo.classList.remove('hidden');
+    pEmo.textContent = player.avatarEmoji;
+  }
+
+  const eqSkin = findItemById(player.equippedSkin);
+  const eqPet = findItemById(player.equippedPet);
+  if (eqSkin) document.getElementById('home-equipped-skin').textContent = eqSkin.name;
+  if (eqPet) document.getElementById('home-equipped-pet').textContent = eqPet.name;
+  document.getElementById('home-best-dist').textContent = `${player.bestDistance.toFixed(2)} км`;
+
+  document.getElementById('set-music').checked = player.settings.music;
+  document.getElementById('set-sfx').checked = player.settings.sfx;
+  document.getElementById('set-volume').value = Math.round(player.settings.volume * 100);
+  document.getElementById('set-vol-label').textContent = `${Math.round(player.settings.volume * 100)}%`;
+  document.getElementById('set-quality').value = player.settings.quality;
+}
+
+function showToast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `ice-glass px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow-xl border ${type === 'error' ? 'border-rose-500/60 text-rose-200' : 'border-cyan-400/50 text-cyan-100'} transition-all duration-300`;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 350);
+  }, 3200);
+}
+
+document.getElementById('btn-pause').onclick = pauseGame;
+document.getElementById('btn-modal-menu').onclick = returnToMainMenu;
+document.getElementById('btn-close-chest').onclick = () => document.getElementById('chest-modal').classList.add('hidden');
+document.getElementById('btn-quick-music').onclick = () => {
+  const nextState = !player.settings.music;
+  toggleSetting('music', nextState);
+  document.getElementById('set-music').checked = nextState;
+  showToast(nextState ? '🎵 Музыка включена' : '🔇 Музыка выключена', 'info');
+};
+
+window.onload = () => {
+  initOrRefreshQuests();
+  initThreeWorld();
+  updateAllUI();
+  renderProfile();
+  requestAnimationFrame(animate);
+};
+</script>
+</body>
+</html>
